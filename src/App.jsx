@@ -639,6 +639,7 @@ export default function App() {
   const [regPhoto, setRegPhoto] = useState(null);
   const [voteChangeTarget, setVoteChangeTarget] = useState(null);
   const [voteChangeTeam, setVoteChangeTeam] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
   const fileRef = useRef();
   const pollRef = useRef();
 
@@ -667,14 +668,23 @@ export default function App() {
 
   // ── Register ──
   const handleRegister = async () => {
+    // منع الضغط المزدوج
+    if (submitting) return;
+
+    // تحقق فوري قبل أي طلب
     if (!regName.trim()) return showToast("⚠️ اكتب اسمك");
     if (!regTeam) return showToast("⚠️ اختر منتخبك");
-    if (participants.find(p => p.name.trim().toLowerCase() === regName.trim().toLowerCase()))
-      return showToast("⚠️ هذا الاسم مسجل مسبقاً");
-    if (teamCount(regTeam) >= MAX_PER_TEAM)
-      return showToast(`⚠️ هذا المنتخب وصل الحد الأقصى (${MAX_PER_TEAM} أشخاص)`);
     if (!regJerseyName.trim()) return showToast("⚠️ أدخل الاسم للطباعة على التيشرت");
     if (!regJerseyNum.trim()) return showToast("⚠️ أدخل الرقم للطباعة على التيشرت");
+
+    // تحقق من التكرار محلياً أولاً
+    const duplicate = participants.find(p => p.name.trim().toLowerCase() === regName.trim().toLowerCase());
+    if (duplicate) return showToast("⚠️ هذا الاسم مسجل مسبقاً");
+    if (teamCount(regTeam) >= MAX_PER_TEAM)
+      return showToast(`⚠️ هذا المنتخب وصل الحد الأقصى (${MAX_PER_TEAM} أشخاص)`);
+
+    // قفل الزر فوراً
+    setSubmitting(true);
 
     const team = TEAMS.find(t => t.id === regTeam);
     const row = {
@@ -689,6 +699,17 @@ export default function App() {
     };
 
     try {
+      // تحقق من Supabase أن الاسم مو مكرر (double-check)
+      const latest = await sb.select();
+      if (Array.isArray(latest)) {
+        const serverDup = latest.find(p => p.name.trim().toLowerCase() === regName.trim().toLowerCase());
+        if (serverDup) {
+          setSubmitting(false);
+          return showToast("⚠️ هذا الاسم مسجل مسبقاً");
+        }
+        setParticipants(latest);
+      }
+
       const res = await sb.insert(row);
       if (Array.isArray(res) && res[0]) {
         setParticipants(prev => [...prev, res[0]]);
@@ -699,7 +720,11 @@ export default function App() {
       } else {
         showToast("❌ فشل التسجيل — حاول مجدداً");
       }
-    } catch { showToast("❌ خطأ في الاتصال"); }
+    } catch {
+      showToast("❌ خطأ في الاتصال");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // ── Update odds ──
@@ -931,12 +956,40 @@ export default function App() {
                     }
                   </div>
                   <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}}
-                    onChange={e=>{const f=e.target.files?.[0];if(f){const r=new FileReader();r.onload=ev=>setRegPhoto(ev.target.result);r.readAsDataURL(f);}}} />
+                    onChange={e=>{
+                      const f=e.target.files?.[0];
+                      if(!f) return;
+                      const canvas = document.createElement('canvas');
+                      const ctx = canvas.getContext('2d');
+                      const img = new Image();
+                      const url = URL.createObjectURL(f);
+                      img.onload = () => {
+                        // Fix EXIF orientation for iOS photos from album
+                        const MAX = 800;
+                        let w = img.width, h = img.height;
+                        if (w > h) { if (w > MAX) { h = h * MAX / w; w = MAX; } }
+                        else { if (h > MAX) { w = w * MAX / h; h = MAX; } }
+                        canvas.width = w;
+                        canvas.height = h;
+                        ctx.drawImage(img, 0, 0, w, h);
+                        URL.revokeObjectURL(url);
+                        setRegPhoto(canvas.toDataURL('image/jpeg', 0.85));
+                      };
+                      img.onerror = () => {
+                        // Fallback to FileReader
+                        const r = new FileReader();
+                        r.onload = ev => setRegPhoto(ev.target.result);
+                        r.readAsDataURL(f);
+                      };
+                      img.src = url;
+                    }} />
                   <div style={{display:"flex",gap:8}}>
                     <button className="btn btn-outline btn-sm" style={{flex:1}} onClick={()=>setRegStep(2)}>→ رجوع</button>
                     <button className="btn btn-sm" style={{flex:2}}
-                      disabled={!regJerseyName.trim()||!regJerseyNum.trim()}
-                      onClick={handleRegister}>تأكيد التسجيل ✓</button>
+                      disabled={!regJerseyName.trim()||!regJerseyNum.trim()||submitting}
+                      onClick={handleRegister}>
+                      {submitting ? <span><span className="spin">⟳</span> جاري التسجيل...</span> : "تأكيد التسجيل ✓"}
+                    </button>
                   </div>
                 </>
               )}
