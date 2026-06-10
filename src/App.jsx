@@ -1074,7 +1074,7 @@ export default function App() {
           )}
 
           {/* ══ STATS ══ */}
-          {tab === "stats" && <StatsTab participants={participants} odds={odds} />}
+          {tab === "bracket" && <BracketTab participants={participants} adminUnlocked={adminUnlocked} />}            {tab === "stats" && <StatsTab participants={participants} odds={odds} />}
 
           {/* ══ GUIDE ══ */}
           {tab === "guide" && (
