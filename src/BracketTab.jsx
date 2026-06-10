@@ -3,7 +3,65 @@
 //  يُضاف كـ tab في App.jsx
 //  بيانات المجموعات الرسمية (draw ديسمبر 2025)
 // ══════════════════════════════════════════════════════
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+
+// ── جلب النتائج من الإنترنت عبر Claude ───────────────
+async function fetchLiveMatchResults() {
+  const teamIds = [
+    "mexico","southafrica","southkorea","czech",
+    "canada","bosnia","qatar","switzerland",
+    "brazil","morocco","haiti","scotland",
+    "usa","paraguay","australia","turkey",
+    "germany","curacao","ivorycoast","ecuador",
+    "netherlands","japan","sweden","tunisia",
+    "belgium","egypt","iran","newzealand",
+    "spain","capeverde","saudiarabia","uruguay",
+    "france","senegal","iraq","norway",
+    "argentina","algeria","austria","jordan",
+    "portugal","drcongo","uzbekistan","colombia",
+    "england","croatia","ghana","panama"
+  ];
+
+  try {
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 3000,
+        tools: [{ type: "web_search_20250305", name: "web_search" }],
+        messages: [{
+          role: "user",
+          content: `Search for ALL FIFA World Cup 2026 group stage match results that have been played so far. Today is ${new Date().toLocaleDateString('en-US', {year:'numeric',month:'long',day:'numeric'})}.
+
+Return ONLY a valid JSON object. Key format: "GROUP_homeId_awayId" where GROUP is A-L and IDs from this list: ${teamIds.join(',')}.
+
+Example format:
+{
+  "A_mexico_southafrica": {"homeScore": 2, "awayScore": 0, "played": true},
+  "C_brazil_morocco": {"homeScore": 1, "awayScore": 1, "played": true}
+}
+
+Only include matches already played. Return ONLY the JSON object, nothing else.`
+        }]
+      })
+    });
+    const d = await r.json();
+    const tb = d.content?.find(b => b.type === "text");
+    if (!tb) return null;
+    const m = tb.text.replace(/```json|```/g, "").trim().match(/\{[\s\S]*\}/);
+    if (!m) return null;
+    const results = JSON.parse(m[0]);
+    // تحقق من صحة البيانات
+    const valid = {};
+    for (const [k, v] of Object.entries(results)) {
+      if (v.played && typeof v.homeScore === 'number' && typeof v.awayScore === 'number') {
+        valid[k] = v;
+      }
+    }
+    return valid;
+  } catch { return null; }
+}
 
 // ── بيانات المجموعات الرسمية ──────────────────────────
 const GROUPS_DATA = {
@@ -130,9 +188,30 @@ export default function BracketTab({ participants = [], adminUnlocked = false })
   const [editingMatch, setEditingMatch] = useState(null);
   const [editScore, setEditScore] = useState({ home: "", away: "" });
   const [editingKO, setEditingKO] = useState(null);
+  const [fetchingResults, setFetchingResults] = useState(false);
+  const [lastFetch, setLastFetch] = useState(null);
+  const [fetchStatus, setFetchStatus] = useState("");
 
   // فرق المشاركين
   const compTeamIds = new Set(participants.map(p => p.team_id));
+
+  // جلب النتائج التلقائي
+  const handleFetchResults = async () => {
+    setFetchingResults(true);
+    setFetchStatus("🔍 يبحث عن النتائج...");
+    const results = await fetchLiveMatchResults();
+    setFetchingResults(false);
+    if (results && Object.keys(results).length > 0) {
+      const newData = { ...matchData, ...results };
+      setMatchData(newData);
+      localStorage.setItem("wc2026_matches", JSON.stringify(newData));
+      setLastFetch(new Date().toLocaleTimeString("ar-SA"));
+      setFetchStatus(`✅ تم تحديث ${Object.keys(results).length} مباراة`);
+    } else {
+      setFetchStatus("⚠️ لم تُعثر على نتائج جديدة");
+    }
+    setTimeout(() => setFetchStatus(""), 4000);
+  };
 
   const saveMatch = () => {
     const h = parseInt(editScore.home), a = parseInt(editScore.away);
@@ -232,6 +311,20 @@ export default function BracketTab({ participants = [], adminUnlocked = false })
       <div className="br-nav">
         <button className={`br-nav-btn${subTab==="groups"?" active":""}`} onClick={()=>setSubTab("groups")}>🏟️ المجموعات</button>
         <button className={`br-nav-btn${subTab==="knockout"?" active":""}`} onClick={()=>setSubTab("knockout")}>⚔️ الأدوار الإقصائية</button>
+      </div>
+
+      {/* زر التحديث التلقائي */}
+      <div style={{marginBottom:14,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+        <button
+          onClick={handleFetchResults}
+          disabled={fetchingResults}
+          style={{background:fetchingResults?"rgba(255,255,255,0.06)":"linear-gradient(135deg,#44ddff,#0099cc)",border:"none",borderRadius:10,padding:"9px 16px",color:fetchingResults?"#a0b8a8":"#000",fontFamily:"Cairo,sans-serif",fontSize:"0.82rem",fontWeight:700,cursor:fetchingResults?"not-allowed":"pointer",transition:"all .2s",display:"flex",alignItems:"center",gap:6}}
+        >
+          <span style={{display:"inline-block",animation:fetchingResults?"spin 1s linear infinite":"none"}}>🔄</span>
+          {fetchingResults ? "جاري البحث..." : "تحديث النتائج من الإنترنت"}
+        </button>
+        {lastFetch && <span style={{fontSize:"0.72rem",color:"#a0b8a8"}}>آخر تحديث: {lastFetch}</span>}
+        {fetchStatus && <span style={{fontSize:"0.78rem",color:fetchStatus.startsWith("✅")?"#4cff88":fetchStatus.startsWith("⚠️")?"#ffcc44":"#44ddff",fontWeight:700}}>{fetchStatus}</span>}
       </div>
 
       {/* Legend */}
