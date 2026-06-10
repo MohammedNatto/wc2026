@@ -1,3 +1,4 @@
+import BracketTab from "./BracketTab";
 import { useState, useEffect, useCallback, useRef } from "react";
 
 // ── Supabase Config ───────────────────────────────────────────────────────────
@@ -883,6 +884,7 @@ export default function App() {
           <button className={`nav-btn${tab==="register"?" active":""}`} onClick={()=>setTab("register")}>📝 سجّل</button>
           <button className={`nav-btn${tab==="leaderboard"?" active":""}`} onClick={()=>setTab("leaderboard")}>🏅 الترتيب</button>
           <button className={`nav-btn${tab==="stats"?" active":""}`} onClick={()=>setTab("stats")}>📊 إحصائيات</button>
+          <button className={`nav-btn${tab==="bracket"?" active":""}`} onClick={()=>setTab("bracket")}>🗺️ الخريطة</button>
           <button className={`nav-btn${tab==="guide"?" active":""}`} onClick={()=>setTab("guide")}>🌍 الدليل</button>
           <button className={`nav-btn${tab==="admin"?" active":""}`} onClick={()=>setTab("admin")}>⚙️</button>
         </div>
@@ -1106,6 +1108,9 @@ export default function App() {
 
           {/* ══ STATS ══ */}
           {tab === "stats" && <StatsTab participants={participants} odds={odds} />}
+
+          {/* ══ BRACKET ══ */}
+          {tab === "bracket" && <BracketTab participants={participants} adminUnlocked={adminUnlocked} />}
 
           {/* ══ GUIDE ══ */}
           {tab === "guide" && (
