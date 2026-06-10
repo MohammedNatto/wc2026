@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import BracketTab from "./BracketTab";
+import { useState, useEffect, useCallback, useRef }
 
 // ── Supabase Config ───────────────────────────────────────────────────────────
 const SUPABASE_URL = "https://hhhijbdvcasbpmcefmef.supabase.co";
