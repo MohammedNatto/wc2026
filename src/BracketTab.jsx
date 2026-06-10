@@ -139,6 +139,82 @@ const GROUPS_DATA = {
   ]},
 };
 
+// ── جدول المباريات بتوقيت السعودية (UTC+3) ─────────────
+const MATCH_SCHEDULE = {
+  "A_mexico_southafrica":    { date:"الخميس 11 يونيو",  time:"10:00 م" },
+  "A_southkorea_czech":      { date:"الجمعة 12 يونيو",  time:"05:00 ص" },
+  "A_czech_southafrica":     { date:"الخميس 18 يونيو",  time:"07:00 م" },
+  "A_mexico_southkorea":     { date:"الجمعة 19 يونيو",  time:"04:00 ص" },
+  "A_czech_mexico":          { date:"الأربعاء 25 يونيو", time:"04:00 ص" },
+  "A_southafrica_southkorea":{ date:"الأربعاء 25 يونيو", time:"04:00 ص" },
+  "B_canada_bosnia":         { date:"الجمعة 12 يونيو",  time:"10:00 م" },
+  "B_qatar_switzerland":     { date:"السبت 13 يونيو",   time:"10:00 م" },
+  "B_switzerland_bosnia":    { date:"الخميس 18 يونيو",  time:"10:00 م" },
+  "B_canada_qatar":          { date:"الجمعة 19 يونيو",  time:"01:00 ص" },
+  "B_switzerland_canada":    { date:"الأربعاء 25 يونيو", time:"10:00 م" },
+  "B_bosnia_qatar":          { date:"الأربعاء 25 يونيو", time:"10:00 م" },
+  "C_brazil_morocco":        { date:"السبت 13 يونيو",   time:"01:00 ص" },
+  "C_haiti_scotland":        { date:"السبت 13 يونيو",   time:"04:00 ص" },
+  "C_scotland_morocco":      { date:"الجمعة 20 يونيو",  time:"01:00 ص" },
+  "C_brazil_haiti":          { date:"الجمعة 20 يونيو",  time:"03:30 ص" },
+  "C_scotland_brazil":       { date:"الأربعاء 25 يونيو", time:"01:00 ص" },
+  "C_morocco_haiti":         { date:"الأربعاء 25 يونيو", time:"01:00 ص" },
+  "D_usa_paraguay":          { date:"السبت 13 يونيو",   time:"04:00 ص" },
+  "D_australia_turkey":      { date:"الأحد 14 يونيو",   time:"07:00 م" },
+  "D_usa_australia":         { date:"الجمعة 20 يونيو",  time:"10:00 م" },
+  "D_turkey_paraguay":       { date:"السبت 21 يونيو",   time:"06:00 ص" },
+  "D_turkey_usa":            { date:"الخميس 26 يونيو",  time:"05:00 ص" },
+  "D_paraguay_australia":    { date:"الخميس 26 يونيو",  time:"05:00 ص" },
+  "E_germany_curacao":       { date:"الأحد 14 يونيو",   time:"08:00 م" },
+  "E_ivorycoast_ecuador":    { date:"الاثنين 15 يونيو", time:"02:00 ص" },
+  "E_germany_ivorycoast":    { date:"السبت 21 يونيو",   time:"11:00 م" },
+  "E_ecuador_curacao":       { date:"الأحد 22 يونيو",   time:"03:00 ص" },
+  "E_curacao_ivorycoast":    { date:"الخميس 26 يونيو",  time:"11:00 م" },
+  "E_ecuador_germany":       { date:"الخميس 26 يونيو",  time:"11:00 م" },
+  "F_netherlands_japan":     { date:"الأحد 14 يونيو",   time:"11:00 م" },
+  "F_sweden_tunisia":        { date:"الاثنين 15 يونيو", time:"05:00 ص" },
+  "F_netherlands_sweden":    { date:"السبت 21 يونيو",   time:"08:00 م" },
+  "F_tunisia_japan":         { date:"الأحد 22 يونيو",   time:"07:00 ص" },
+  "F_japan_sweden":          { date:"الجمعة 26 يونيو",  time:"02:00 ص" },
+  "F_tunisia_netherlands":   { date:"الجمعة 26 يونيو",  time:"02:00 ص" },
+  "G_belgium_egypt":         { date:"الاثنين 16 يونيو", time:"10:00 م" },
+  "G_iran_newzealand":       { date:"الثلاثاء 17 يونيو",time:"04:00 ص" },
+  "G_belgium_iran":          { date:"الاثنين 23 يونيو", time:"10:00 م" },
+  "G_newzealand_egypt":      { date:"الثلاثاء 24 يونيو",time:"04:00 ص" },
+  "G_egypt_iran":            { date:"الجمعة 27 يونيو",  time:"06:00 ص" },
+  "G_newzealand_belgium":    { date:"الجمعة 27 يونيو",  time:"06:00 ص" },
+  "H_spain_capeverde":       { date:"الاثنين 16 يونيو", time:"07:00 م" },
+  "H_saudiarabia_uruguay":   { date:"الثلاثاء 17 يونيو",time:"01:00 ص" },
+  "H_spain_saudiarabia":     { date:"الأحد 22 يونيو",   time:"07:00 م" },
+  "H_uruguay_capeverde":     { date:"الاثنين 23 يونيو", time:"01:00 ص" },
+  "H_capeverde_saudiarabia": { date:"الجمعة 27 يونيو",  time:"03:00 ص" },
+  "H_uruguay_spain":         { date:"الجمعة 27 يونيو",  time:"03:00 ص" },
+  "I_france_senegal":        { date:"الثلاثاء 17 يونيو",time:"10:00 م" },
+  "I_iraq_norway":           { date:"الأربعاء 18 يونيو",time:"01:00 ص" },
+  "I_france_iraq":           { date:"الاثنين 23 يونيو", time:"12:00 ص" },
+  "I_norway_senegal":        { date:"الثلاثاء 24 يونيو",time:"03:00 ص" },
+  "I_norway_france":         { date:"الجمعة 27 يونيو",  time:"10:00 م" },
+  "I_senegal_iraq":          { date:"الجمعة 27 يونيو",  time:"10:00 م" },
+  "J_argentina_algeria":     { date:"الأربعاء 18 يونيو",time:"04:00 ص" },
+  "J_austria_jordan":        { date:"الأربعاء 18 يونيو",time:"07:00 ص" },
+  "J_argentina_austria":     { date:"الاثنين 23 يونيو", time:"08:00 م" },
+  "J_jordan_algeria":        { date:"الثلاثاء 24 يونيو",time:"06:00 ص" },
+  "J_algeria_austria":       { date:"السبت 28 يونيو",   time:"05:00 ص" },
+  "J_jordan_argentina":      { date:"السبت 28 يونيو",   time:"05:00 ص" },
+  "K_portugal_drcongo":      { date:"الأربعاء 18 يونيو",time:"08:00 م" },
+  "K_uzbekistan_colombia":   { date:"الخميس 19 يونيو",  time:"05:00 ص" },
+  "K_portugal_uzbekistan":   { date:"الثلاثاء 24 يونيو",time:"08:00 م" },
+  "K_colombia_drcongo":      { date:"الأربعاء 25 يونيو",time:"05:00 ص" },
+  "K_colombia_portugal":     { date:"السبت 28 يونيو",   time:"02:30 ص" },
+  "K_drcongo_uzbekistan":    { date:"السبت 28 يونيو",   time:"02:30 ص" },
+  "L_england_croatia":       { date:"الأربعاء 18 يونيو",time:"11:00 م" },
+  "L_ghana_panama":          { date:"الخميس 19 يونيو",  time:"02:00 ص" },
+  "L_england_ghana":         { date:"الثلاثاء 24 يونيو",time:"11:00 م" },
+  "L_panama_croatia":        { date:"الأربعاء 25 يونيو",time:"02:00 ص" },
+  "L_panama_england":        { date:"السبت 28 يونيو",   time:"12:00 ص" },
+  "L_croatia_ghana":         { date:"السبت 28 يونيو",   time:"12:00 ص" },
+};
+
 // توليد قائمة المباريات لكل مجموعة
 function getGroupMatches(groupLetter) {
   const teams = GROUPS_DATA[groupLetter].teams;
@@ -405,8 +481,13 @@ export default function BracketTab({ participants = [], adminUnlocked = false })
                         <div key={key} className="match-row" onClick={()=>{setEditingMatch(key);setEditScore(r?{home:String(r.homeScore),away:String(r.awayScore)}:{home:"",away:""});}}>
                           <span className="match-team home">{m.home.flag} {m.home.name}</span>
                           <span className={`match-score ${r?.played?"played":"tbd"}`}>
-                            {r?.played ? `${r.homeScore} - ${r.awayScore}` : "- vs -"}
+                            {r?.played
+                              ? `${r.homeScore} - ${r.awayScore}`
+                              : MATCH_SCHEDULE[key]?.time || "- vs -"}
                           </span>
+                          {!r?.played && MATCH_SCHEDULE[key] && (
+                            <span style={{fontSize:"0.6rem",color:"#a0b8a8",minWidth:80,textAlign:"center"}}>{MATCH_SCHEDULE[key].date}</span>
+                          )}
                           <span className="match-team away">{m.away.name} {m.away.flag}</span>
                           {r?.played && (
                             <button style={{background:"none",border:"none",color:"#ff7777",cursor:"pointer",fontSize:"0.7rem",padding:"0 2px"}} onClick={e=>{e.stopPropagation();clearMatch(key);}}>✕</button>
@@ -417,17 +498,26 @@ export default function BracketTab({ participants = [], adminUnlocked = false })
                   </div>
                 )}
 
-                {/* Show played matches for non-admin */}
+                {/* Show matches for non-admin */}
                 {!adminUnlocked && (
                   <div className="match-list">
-                    {matches.filter(m => matchData[`${g}_${m.home.id}_${m.away.id}`]?.played).map(m => {
+                    {matches.map(m => {
                       const key = `${g}_${m.home.id}_${m.away.id}`;
                       const r = matchData[key];
+                      const sched = MATCH_SCHEDULE[key];
                       return (
-                        <div key={key} style={{display:"flex",alignItems:"center",gap:6,padding:"3px 0",fontSize:"0.74rem"}}>
-                          <span style={{flex:1,textAlign:"right"}}>{m.home.flag} {m.home.name}</span>
-                          <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1rem",color:"#4cff88",minWidth:44,textAlign:"center"}}>{r.homeScore} - {r.awayScore}</span>
-                          <span style={{flex:1}}>{m.away.name} {m.away.flag}</span>
+                        <div key={key} style={{display:"flex",alignItems:"center",gap:4,padding:"4px 0",fontSize:"0.72rem",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                          <span style={{flex:1,textAlign:"right",fontWeight:600}}>{m.home.flag} {m.home.name}</span>
+                          <div style={{textAlign:"center",minWidth:72}}>
+                            {r?.played
+                              ? <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1rem",color:"#4cff88"}}>{r.homeScore} - {r.awayScore}</span>
+                              : <div>
+                                  <div style={{color:"#d4af37",fontWeight:700,fontSize:"0.75rem"}}>{sched?.time || "-"}</div>
+                                  <div style={{color:"#a0b8a8",fontSize:"0.6rem"}}>{sched?.date || ""}</div>
+                                </div>
+                            }
+                          </div>
+                          <span style={{flex:1,fontWeight:600}}>{m.away.name} {m.away.flag}</span>
                         </div>
                       );
                     })}
