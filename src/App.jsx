@@ -196,7 +196,7 @@ function JerseyCard({ teamId, kitType, teamName, teamEn, size = 110, showName = 
 }
 
 // ── Countdown ─────────────────────────────────────────────────────────────────
-const REGISTRATION_DEADLINE = new Date("2026-06-11T15:00:00Z");
+const REGISTRATION_DEADLINE = new Date("2026-06-11T19:00:00Z");
 
 function useCountdown() {
   const [timeLeft, setTimeLeft] = useState(getTimeLeft());
