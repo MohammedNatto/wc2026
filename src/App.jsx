@@ -196,7 +196,7 @@ function JerseyCard({ teamId, kitType, teamName, teamEn, size = 110, showName = 
 }
 
 // ── Countdown ─────────────────────────────────────────────────────────────────
-const REGISTRATION_DEADLINE = new Date("2026-06-11T19:00:00Z");
+const REGISTRATION_DEADLINE = new Date("2026-06-11T15:00:00Z");
 
 function useCountdown() {
   const [timeLeft, setTimeLeft] = useState(getTimeLeft());
@@ -445,6 +445,117 @@ function StatsTab({ participants, odds }) {
   );
 }
 
+// ── NEW: جلب نتائج المباريات (أمس + اليوم) ────────────────────────────────────
+async function fetchMatchData() {
+  const fmt = (d) => d.toLocaleDateString('en-US', {year:'numeric',month:'long',day:'numeric'});
+  const today = fmt(new Date());
+  const yesterday = fmt(new Date(Date.now() - 86400000));
+  try {
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514", max_tokens: 2000,
+        tools: [{ type: "web_search_20250305", name: "web_search" }],
+        messages: [{ role: "user", content:
+`Search for FIFA World Cup 2026 match results and schedule for ${yesterday} and ${today}.
+Return ONLY a valid JSON object in this exact format:
+{
+  "yesterday": [
+    {"group":"A","home":"Mexico","homeFlag":"🇲🇽","away":"South Africa","awayFlag":"🇿🇦","homeScore":2,"awayScore":0,"time":"22:00","status":"finished"}
+  ],
+  "today": [
+    {"group":"B","home":"Canada","homeFlag":"🇨🇦","away":"Bosnia","awayFlag":"🇧🇦","homeScore":null,"awayScore":null,"time":"22:00","status":"upcoming"},
+    {"group":"D","home":"USA","homeFlag":"🇺🇸","away":"Paraguay","awayFlag":"🇵🇾","homeScore":1,"awayScore":0,"time":"04:00","status":"live"}
+  ]
+}
+Status values: "finished"=played, "live"=ongoing, "upcoming"=not started yet.
+All times in Saudi Arabia time (UTC+3). Return ONLY the JSON, nothing else.`
+        }]
+      })
+    });
+    const d = await r.json();
+    const tb = d.content?.find(b => b.type === "text");
+    if (!tb) return null;
+    const m = tb.text.replace(/```json|```/g,"").trim().match(/\{[\s\S]*\}/);
+    return m ? JSON.parse(m[0]) : null;
+  } catch { return null; }
+}
+
+// ── NEW: MatchesTab Component ─────────────────────────────────────────────────
+function MatchesTab({ matchData, loading, lastUpdate, onRefresh, fetchingNow }) {
+  const statusColor = (s) => s==="finished"?"#4cff88":s==="live"?"#ff6b6b":"#a0b8a8";
+  const statusLabel = (s) => s==="finished"?"✅ انتهت":s==="live"?"🔴 مباشر":"⏳ قريباً";
+
+  const MatchCard = ({ m }) => (
+    <div style={{background:"var(--card-bg)",border:`1px solid ${m.status==="live"?"rgba(255,107,107,0.4)":"rgba(48,79,254,0.15)"}`,borderRadius:14,padding:"14px 16px",marginBottom:10,
+      boxShadow:m.status==="live"?"0 0 20px rgba(255,107,107,0.15)":"none"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+        <span style={{fontSize:"0.72rem",color:"var(--muted)"}}>المجموعة {m.group}</span>
+        <span style={{fontSize:"0.72rem",color:statusColor(m.status),fontWeight:700}}>{statusLabel(m.status)}</span>
+        <span style={{fontSize:"0.72rem",color:"var(--gold)"}}>{m.time} 🕐</span>
+      </div>
+      <div style={{display:"flex",alignItems:"center",gap:10}}>
+        <div style={{flex:1,textAlign:"right"}}>
+          <div style={{fontSize:"1rem",fontWeight:900}}>{m.homeFlag} {m.home}</div>
+        </div>
+        <div style={{minWidth:70,textAlign:"center"}}>
+          {m.status==="upcoming"
+            ? <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.4rem",color:"var(--muted)"}}>VS</div>
+            : <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"2rem",color:m.status==="live"?"#ff6b6b":"#4cff88",lineHeight:1}}>
+                {m.homeScore} — {m.awayScore}
+              </div>
+          }
+        </div>
+        <div style={{flex:1}}>
+          <div style={{fontSize:"1rem",fontWeight:900}}>{m.away} {m.awayFlag}</div>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:"var(--card-bg)",border:"1px solid rgba(48,79,254,0.2)",borderRadius:10,padding:"9px 13px",marginBottom:14}}>
+        <div style={{fontSize:"0.76rem",color:"var(--muted)"}}>
+          {lastUpdate ? `آخر تحديث: ${lastUpdate}` : "جاري التحديث..."}
+          <span style={{marginRight:8,fontSize:"0.68rem",color:"#4cff88"}}>⟳ كل 5 دقائق</span>
+        </div>
+        <button onClick={onRefresh} disabled={fetchingNow}
+          style={{background:"rgba(48,79,254,0.15)",border:"1px solid rgba(48,79,254,0.4)",borderRadius:8,color:"#7b9cff",fontFamily:"Cairo,sans-serif",fontSize:"0.73rem",fontWeight:700,padding:"5px 11px",cursor:fetchingNow?"not-allowed":"pointer",transition:"all .2s"}}>
+          {fetchingNow ? <span style={{display:"inline-block",animation:"spin 1s linear infinite"}}>⟳</span> : "⟳"} تحديث
+        </button>
+      </div>
+
+      {loading
+        ? <div style={{textAlign:"center",padding:"50px 20px",color:"var(--muted)"}}>
+            <div style={{fontSize:"2rem",animation:"spin 1s linear infinite",display:"block",marginBottom:12}}>⟳</div>
+            جاري جلب النتائج من الإنترنت...
+          </div>
+        : !matchData
+          ? <div style={{textAlign:"center",padding:"50px 20px",color:"var(--muted)"}}>
+              <div style={{fontSize:"2.5rem",marginBottom:10}}>⚽</div>
+              <p>اضغط "تحديث" لجلب نتائج اليوم</p>
+            </div>
+          : <>
+              {matchData.today?.length > 0 && (
+                <div className="card" style={{marginBottom:14}}>
+                  <div className="card-title" style={{fontSize:"1rem",marginBottom:12}}>⚽ مباريات اليوم — {new Date().toLocaleDateString("ar-SA",{weekday:"long",day:"numeric",month:"long"})}</div>
+                  {matchData.today.map((m,i) => <MatchCard key={i} m={m}/>)}
+                </div>
+              )}
+              {matchData.yesterday?.length > 0 && (
+                <div className="card">
+                  <div className="card-title" style={{fontSize:"1rem",marginBottom:12}}>📋 نتائج أمس</div>
+                  {matchData.yesterday.map((m,i) => <MatchCard key={i} m={m}/>)}
+                </div>
+              )}
+            </>
+      }
+    </>
+  );
+}
+
 // ── Claude API helpers ────────────────────────────────────────────────────────
 async function fetchLiveOdds() {
   try {
@@ -684,7 +795,7 @@ const TERMS = [
 
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
-  const [tab, setTab] = useState("terms");
+  const [tab, setTab] = useState("leaderboard");
   const [participants, setParticipants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState({ show: false, msg: "" });
@@ -717,10 +828,37 @@ export default function App() {
   const [rtConnected, setRtConnected] = useState(false);
   const prevParticipantIds = useRef(new Set());
 
+  // ── NEW: Matches state ──
+  const [matchesData, setMatchesData] = useState(null);
+  const [matchesLoading, setMatchesLoading] = useState(false);
+  const [matchesLastUpdate, setMatchesLastUpdate] = useState(null);
+  const [matchesFetching, setMatchesFetching] = useState(false);
+
   const fileRef = useRef();
 
   // ── Request notification permission ──
   useEffect(() => { requestNotifPermission(); }, []);
+
+  // ── NEW: Auto-fetch matches every 5 minutes ──
+  const doFetchMatches = async () => {
+    setMatchesFetching(true);
+    const data = await fetchMatchData();
+    setMatchesFetching(false);
+    if (data) {
+      setMatchesData(data);
+      setMatchesLastUpdate(new Date().toLocaleTimeString("ar-SA"));
+    }
+    setMatchesLoading(false);
+  };
+
+  useEffect(() => {
+    // First load
+    setMatchesLoading(true);
+    doFetchMatches();
+    // Auto-refresh every 5 minutes
+    const interval = setInterval(doFetchMatches, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   // ── Initial load ──
   const loadParticipants = useCallback(async () => {
@@ -880,16 +1018,27 @@ export default function App() {
 
         {/* Nav */}
         <div className="nav">
-          <button className={`nav-btn${tab==="terms"?" active":""}`} onClick={()=>setTab("terms")}>📜 الشروط</button>
-          <button className={`nav-btn${tab==="register"?" active":""}`} onClick={()=>setTab("register")}>📝 سجّل</button>
+          <button className={`nav-btn${tab==="matches"?" active":""}`} onClick={()=>setTab("matches")}>📅 المباريات</button>
           <button className={`nav-btn${tab==="leaderboard"?" active":""}`} onClick={()=>setTab("leaderboard")}>🏅 الترتيب</button>
           <button className={`nav-btn${tab==="stats"?" active":""}`} onClick={()=>setTab("stats")}>📊 إحصائيات</button>
           <button className={`nav-btn${tab==="bracket"?" active":""}`} onClick={()=>setTab("bracket")}>🗺️ الخريطة</button>
           <button className={`nav-btn${tab==="guide"?" active":""}`} onClick={()=>setTab("guide")}>🌍 الدليل</button>
+          <button className={`nav-btn${tab==="terms"?" active":""}`} onClick={()=>setTab("terms")}>📜 الشروط</button>
           <button className={`nav-btn${tab==="admin"?" active":""}`} onClick={()=>setTab("admin")}>⚙️</button>
         </div>
 
         <div className="main">
+
+          {/* ══ MATCHES ══ */}
+          {tab === "matches" && (
+            <MatchesTab
+              matchData={matchesData}
+              loading={matchesLoading}
+              lastUpdate={matchesLastUpdate}
+              fetchingNow={matchesFetching}
+              onRefresh={doFetchMatches}
+            />
+          )}
 
           {/* ══ TERMS ══ */}
           {tab === "terms" && (
