@@ -289,6 +289,12 @@ export default function BracketTab({ participants = [], adminUnlocked = false })
     setTimeout(() => setFetchStatus(""), 4000);
   };
 
+  // ── تحديث تلقائي كل دقيقة ──
+  useEffect(() => {
+    const interval = setInterval(handleFetchResults, 60 * 1000);
+    return () => clearInterval(interval);
+  }, [matchData]);
+
   const saveMatch = () => {
     const h = parseInt(editScore.home), a = parseInt(editScore.away);
     if (isNaN(h) || isNaN(a) || h < 0 || a < 0) return;
