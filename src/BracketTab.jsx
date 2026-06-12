@@ -5,61 +5,102 @@
 // ══════════════════════════════════════════════════════
 import { useState, useMemo, useEffect } from "react";
 
-// ── جلب النتائج من الإنترنت عبر Claude ───────────────
+// ── جلب النتائج عبر ESPN API (بدون مفتاح) ────────────
+// نفس TEAM_FLAGS_MAP من App.jsx
+const FLAGS = {
+  "Mexico":"🇲🇽","South Africa":"🇿🇦","Korea Republic":"🇰🇷","South Korea":"🇰🇷","Czechia":"🇨🇿","Czech Republic":"🇨🇿",
+  "Canada":"🇨🇦","Bosnia and Herzegovina":"🇧🇦","Qatar":"🇶🇦","Switzerland":"🇨🇭",
+  "Brazil":"🇧🇷","Morocco":"🇲🇦","Haiti":"🇭🇹","Scotland":"🏴󠁧󠁢󠁳󠁣󠁴󠁿",
+  "United States":"🇺🇸","USA":"🇺🇸","Paraguay":"🇵🇾","Australia":"🇦🇺","Türkiye":"🇹🇷","Turkey":"🇹🇷",
+  "Germany":"🇩🇪","Curaçao":"🇨🇼","Côte d'Ivoire":"🇨🇮","Ivory Coast":"🇨🇮","Ecuador":"🇪🇨",
+  "Netherlands":"🇳🇱","Japan":"🇯🇵","Sweden":"🇸🇪","Tunisia":"🇹🇳",
+  "Belgium":"🇧🇪","Egypt":"🇪🇬","Iran":"🇮🇷","New Zealand":"🇳🇿",
+  "Spain":"🇪🇸","Cape Verde":"🇨🇻","Saudi Arabia":"🇸🇦","Uruguay":"🇺🇾",
+  "France":"🇫🇷","Senegal":"🇸🇳","Iraq":"🇮🇶","Norway":"🇳🇴",
+  "Argentina":"🇦🇷","Algeria":"🇩🇿","Austria":"🇦🇹","Jordan":"🇯🇴",
+  "Portugal":"🇵🇹","DR Congo":"🇨🇩","Uzbekistan":"🇺🇿","Colombia":"🇨🇴",
+  "England":"🏴󠁧󠁢󠁥󠁮󠁧󠁿","Croatia":"🇭🇷","Ghana":"🇬🇭","Panama":"🇵🇦",
+};
+
+// خريطة أسماء الفرق → team IDs في التطبيق
+const NAME_TO_ID = {
+  "Mexico":"mexico","South Africa":"southafrica","Korea Republic":"southkorea","South Korea":"southkorea",
+  "Czechia":"czech","Czech Republic":"czech","Canada":"canada","Bosnia and Herzegovina":"bosnia",
+  "Qatar":"qatar","Switzerland":"switzerland","Brazil":"brazil","Morocco":"morocco",
+  "Haiti":"haiti","Scotland":"scotland","United States":"usa","USA":"usa",
+  "Paraguay":"paraguay","Australia":"australia","Türkiye":"turkey","Turkey":"turkey",
+  "Germany":"germany","Curaçao":"curacao","Côte d'Ivoire":"ivorycoast","Ivory Coast":"ivorycoast",
+  "Ecuador":"ecuador","Netherlands":"netherlands","Japan":"japan","Sweden":"sweden","Tunisia":"tunisia",
+  "Belgium":"belgium","Egypt":"egypt","Iran":"iran","New Zealand":"newzealand",
+  "Spain":"spain","Cape Verde":"capeverde","Saudi Arabia":"saudiarabia","Uruguay":"uruguay",
+  "France":"france","Senegal":"senegal","Iraq":"iraq","Norway":"norway",
+  "Argentina":"argentina","Algeria":"algeria","Austria":"austria","Jordan":"jordan",
+  "Portugal":"portugal","DR Congo":"drcongo","Uzbekistan":"uzbekistan","Colombia":"colombia",
+  "England":"england","Croatia":"croatia","Ghana":"ghana","Panama":"panama",
+};
+
+// خريطة المجموعات
+const TEAM_GROUP = {
+  mexico:"A",southafrica:"A",southkorea:"A",czech:"A",
+  canada:"B",bosnia:"B",qatar:"B",switzerland:"B",
+  brazil:"C",morocco:"C",haiti:"C",scotland:"C",
+  usa:"D",paraguay:"D",australia:"D",turkey:"D",
+  germany:"E",curacao:"E",ivorycoast:"E",ecuador:"E",
+  netherlands:"F",japan:"F",sweden:"F",tunisia:"F",
+  belgium:"G",egypt:"G",iran:"G",newzealand:"G",
+  spain:"H",capeverde:"H",saudiarabia:"H",uruguay:"H",
+  france:"I",senegal:"I",iraq:"I",norway:"I",
+  argentina:"J",algeria:"J",austria:"J",jordan:"J",
+  portugal:"K",drcongo:"K",uzbekistan:"K",colombia:"K",
+  england:"L",croatia:"L",ghana:"L",panama:"L",
+};
+
 async function fetchLiveMatchResults() {
-  const teamIds = [
-    "mexico","southafrica","southkorea","czech",
-    "canada","bosnia","qatar","switzerland",
-    "brazil","morocco","haiti","scotland",
-    "usa","paraguay","australia","turkey",
-    "germany","curacao","ivorycoast","ecuador",
-    "netherlands","japan","sweden","tunisia",
-    "belgium","egypt","iran","newzealand",
-    "spain","capeverde","saudiarabia","uruguay",
-    "france","senegal","iraq","norway",
-    "argentina","algeria","austria","jordan",
-    "portugal","drcongo","uzbekistan","colombia",
-    "england","croatia","ghana","panama"
-  ];
+  // نجلب من ESPN API مباشرة — بدون مفتاح
+  const fmtDate = (d) => d.toISOString().slice(0,10).replace(/-/g,'');
+  const results = {};
+
+  // نجلب آخر 14 يوم (فترة دور المجموعات)
+  const dates = [];
+  for (let i = 0; i <= 20; i++) {
+    dates.push(fmtDate(new Date(Date.now() - i * 86400000)));
+  }
 
   try {
-    const r = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 3000,
-        tools: [{ type: "web_search_20250305", name: "web_search" }],
-        messages: [{
-          role: "user",
-          content: `Search for ALL FIFA World Cup 2026 group stage match results that have been played so far. Today is ${new Date().toLocaleDateString('en-US', {year:'numeric',month:'long',day:'numeric'})}.
+    // نجلب كل مباريات البطولة حتى اليوم
+    const uniqueDates = [...new Set(dates)];
+    const responses = await Promise.all(
+      uniqueDates.slice(0, 10).map(d =>
+        fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=${d}`)
+          .then(r => r.json())
+          .catch(() => null)
+      )
+    );
 
-Return ONLY a valid JSON object. Key format: "GROUP_homeId_awayId" where GROUP is A-L and IDs from this list: ${teamIds.join(',')}.
+    for (const data of responses) {
+      if (!data?.events) continue;
+      for (const e of data.events) {
+        if (e.status?.type?.state !== "post") continue; // فقط المنتهية
+        const comp = e.competitions?.[0];
+        const home = comp?.competitors?.find(c => c.homeAway === 'home');
+        const away = comp?.competitors?.find(c => c.homeAway === 'away');
+        if (!home || !away) continue;
 
-Example format:
-{
-  "A_mexico_southafrica": {"homeScore": 2, "awayScore": 0, "played": true},
-  "C_brazil_morocco": {"homeScore": 1, "awayScore": 1, "played": true}
-}
+        const homeId = NAME_TO_ID[home.team?.displayName] || NAME_TO_ID[home.team?.shortDisplayName];
+        const awayId = NAME_TO_ID[away.team?.displayName] || NAME_TO_ID[away.team?.shortDisplayName];
+        if (!homeId || !awayId) continue;
 
-Only include matches already played. Return ONLY the JSON object, nothing else.`
-        }]
-      })
-    });
-    const d = await r.json();
-    const tb = d.content?.find(b => b.type === "text");
-    if (!tb) return null;
-    const m = tb.text.replace(/```json|```/g, "").trim().match(/\{[\s\S]*\}/);
-    if (!m) return null;
-    const results = JSON.parse(m[0]);
-    // تحقق من صحة البيانات
-    const valid = {};
-    for (const [k, v] of Object.entries(results)) {
-      if (v.played && typeof v.homeScore === 'number' && typeof v.awayScore === 'number') {
-        valid[k] = v;
+        const group = TEAM_GROUP[homeId] || TEAM_GROUP[awayId] || "?";
+        const key = `${group}_${homeId}_${awayId}`;
+        results[key] = {
+          homeScore: parseInt(home.score ?? 0),
+          awayScore: parseInt(away.score ?? 0),
+          played: true
+        };
       }
     }
-    return valid;
+
+    return Object.keys(results).length > 0 ? results : null;
   } catch { return null; }
 }
 
@@ -289,11 +330,12 @@ export default function BracketTab({ participants = [], adminUnlocked = false })
     setTimeout(() => setFetchStatus(""), 4000);
   };
 
-  // ── تحديث تلقائي كل دقيقة ──
+  // ── جلب فوري عند تحميل الصفحة + تحديث كل دقيقة ──
   useEffect(() => {
+    handleFetchResults(); // فوراً عند الفتح
     const interval = setInterval(handleFetchResults, 60 * 1000);
     return () => clearInterval(interval);
-  }, [matchData]);
+  }, []); // [] = مرة واحدة عند mount
 
   const saveMatch = () => {
     const h = parseInt(editScore.home), a = parseInt(editScore.away);
