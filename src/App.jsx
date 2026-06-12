@@ -445,40 +445,67 @@ function StatsTab({ participants, odds }) {
   );
 }
 
-// ── NEW: جلب نتائج المباريات (أمس + اليوم) ────────────────────────────────────
-async function fetchMatchData() {
-  const fmt = (d) => d.toLocaleDateString('en-US', {year:'numeric',month:'long',day:'numeric'});
-  const today = fmt(new Date());
-  const yesterday = fmt(new Date(Date.now() - 86400000));
-  try {
-    const r = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514", max_tokens: 2000,
-        tools: [{ type: "web_search_20250305", name: "web_search" }],
-        messages: [{ role: "user", content:
-`Search for FIFA World Cup 2026 match results and schedule for ${yesterday} and ${today}.
-Return ONLY a valid JSON object in this exact format:
-{
-  "yesterday": [
-    {"group":"A","home":"Mexico","homeFlag":"🇲🇽","away":"South Africa","awayFlag":"🇿🇦","homeScore":2,"awayScore":0,"time":"22:00","status":"finished"}
-  ],
-  "today": [
-    {"group":"B","home":"Canada","homeFlag":"🇨🇦","away":"Bosnia","awayFlag":"🇧🇦","homeScore":null,"awayScore":null,"time":"22:00","status":"upcoming"},
-    {"group":"D","home":"USA","homeFlag":"🇺🇸","away":"Paraguay","awayFlag":"🇵🇾","homeScore":1,"awayScore":0,"time":"04:00","status":"live"}
-  ]
+// ── NEW: جلب نتائج المباريات عبر ESPN API (بدون مفتاح) ───────────────────────
+const TEAM_FLAGS_MAP = {
+  "Mexico":"🇲🇽","South Africa":"🇿🇦","South Korea":"🇰🇷","Korea Republic":"🇰🇷","Czechia":"🇨🇿","Czech Republic":"🇨🇿",
+  "Canada":"🇨🇦","Bosnia and Herzegovina":"🇧🇦","Bosnia":"🇧🇦","Qatar":"🇶🇦","Switzerland":"🇨🇭",
+  "Brazil":"🇧🇷","Morocco":"🇲🇦","Haiti":"🇭🇹","Scotland":"🏴󠁧󠁢󠁳󠁣󠁴󠁿",
+  "United States":"🇺🇸","USA":"🇺🇸","Paraguay":"🇵🇾","Australia":"🇦🇺","Türkiye":"🇹🇷","Turkey":"🇹🇷",
+  "Germany":"🇩🇪","Curaçao":"🇨🇼","Côte d'Ivoire":"🇨🇮","Ivory Coast":"🇨🇮","Ecuador":"🇪🇨",
+  "Netherlands":"🇳🇱","Japan":"🇯🇵","Sweden":"🇸🇪","Tunisia":"🇹🇳",
+  "Belgium":"🇧🇪","Egypt":"🇪🇬","Iran":"🇮🇷","New Zealand":"🇳🇿",
+  "Spain":"🇪🇸","Cape Verde":"🇨🇻","Saudi Arabia":"🇸🇦","Uruguay":"🇺🇾",
+  "France":"🇫🇷","Senegal":"🇸🇳","Iraq":"🇮🇶","Norway":"🇳🇴",
+  "Argentina":"🇦🇷","Algeria":"🇩🇿","Austria":"🇦🇹","Jordan":"🇯🇴",
+  "Portugal":"🇵🇹","DR Congo":"🇨🇩","Uzbekistan":"🇺🇿","Colombia":"🇨🇴",
+  "England":"🏴󠁧󠁢󠁥󠁮󠁧󠁿","Croatia":"🇭🇷","Ghana":"🇬🇭","Panama":"🇵🇦",
+};
+
+function getFlag(name) {
+  return TEAM_FLAGS_MAP[name] || "🏳️";
 }
-Status values: "finished"=played, "live"=ongoing, "upcoming"=not started yet.
-All times in Saudi Arabia time (UTC+3). Return ONLY the JSON, nothing else.`
-        }]
-      })
-    });
-    const d = await r.json();
-    const tb = d.content?.find(b => b.type === "text");
-    if (!tb) return null;
-    const m = tb.text.replace(/```json|```/g,"").trim().match(/\{[\s\S]*\}/);
-    return m ? JSON.parse(m[0]) : null;
+
+async function fetchMatchData() {
+  const fmtDate = (d) => d.toISOString().slice(0,10).replace(/-/g,'');
+  const todayStr = fmtDate(new Date());
+  const yestStr = fmtDate(new Date(Date.now() - 86400000));
+
+  const parseESPN = (data) => {
+    if (!data?.events?.length) return [];
+    return data.events.map(e => {
+      const comp = e.competitions?.[0];
+      const home = comp?.competitors?.find(c => c.homeAway === 'home');
+      const away = comp?.competitors?.find(c => c.homeAway === 'away');
+      const st = e.status?.type?.state; // "pre" | "in" | "post"
+      const stName = e.status?.type?.name; // "STATUS_FINAL" etc
+      const homeName = home?.team?.displayName || home?.team?.shortDisplayName || "؟";
+      const awayName = away?.team?.displayName || away?.team?.shortDisplayName || "؟";
+      const isLive = st === "in";
+      const isDone = st === "post";
+      const matchTime = new Date(e.date).toLocaleTimeString('ar-SA', {
+        hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Riyadh'
+      });
+      const note = e.status?.displayClock || "";
+      return {
+        home: homeName, homeFlag: getFlag(homeName),
+        away: awayName, awayFlag: getFlag(awayName),
+        homeScore: !isDone && !isLive ? null : parseInt(home?.score ?? 0),
+        awayScore: !isDone && !isLive ? null : parseInt(away?.score ?? 0),
+        time: matchTime,
+        note: isLive ? `🔴 ${note}` : "",
+        status: isDone ? "finished" : isLive ? "live" : "upcoming",
+        group: comp?.groups?.name || comp?.notes?.[0]?.headline || ""
+      };
+    }).filter(Boolean);
+  };
+
+  try {
+    const [tRes, yRes] = await Promise.all([
+      fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=${todayStr}`),
+      fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=${yestStr}`)
+    ]);
+    const [tData, yData] = await Promise.all([tRes.json(), yRes.json()]);
+    return { today: parseESPN(tData), yesterday: parseESPN(yData) };
   } catch { return null; }
 }
 
@@ -839,8 +866,8 @@ export default function App() {
   // ── Request notification permission ──
   useEffect(() => { requestNotifPermission(); }, []);
 
-  // ── NEW: Auto-fetch matches every 5 minutes ──
-  const doFetchMatches = async () => {
+  // ── NEW: Auto-fetch matches ──
+  const doFetchMatches = useCallback(async () => {
     setMatchesFetching(true);
     const data = await fetchMatchData();
     setMatchesFetching(false);
@@ -849,16 +876,19 @@ export default function App() {
       setMatchesLastUpdate(new Date().toLocaleTimeString("ar-SA"));
     }
     setMatchesLoading(false);
-  };
+  }, []);
 
   useEffect(() => {
-    // First load
     setMatchesLoading(true);
     doFetchMatches();
-    // Auto-refresh every 5 minutes
-    const interval = setInterval(doFetchMatches, 5 * 60 * 1000);
+  }, [doFetchMatches]);
+
+  // تحديث ذكي: كل دقيقة إذا في مباراة مباشرة، وإلا كل 5 دقائق
+  useEffect(() => {
+    const hasLive = matchesData?.today?.some(m => m.status === "live");
+    const interval = setInterval(doFetchMatches, hasLive ? 60 * 1000 : 5 * 60 * 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [matchesData, doFetchMatches]);
 
   // ── Initial load ──
   const loadParticipants = useCallback(async () => {
