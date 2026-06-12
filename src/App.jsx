@@ -1,454 +1,15 @@
-import BracketTab from "./BracketTab";
-import { useState, useEffect, useCallback, useRef } from "react";
+// ══════════════════════════════════════════════════════
+//  BracketTab — خريطة الطريق لكأس العالم 2026
+//  يُضاف كـ tab في App.jsx
+//  بيانات المجموعات الرسمية (draw ديسمبر 2025)
+// ══════════════════════════════════════════════════════
+import { useState, useMemo, useEffect } from "react";
 
-// ── Supabase Config ───────────────────────────────────────────────────────────
-const SUPABASE_URL = "https://hhhijbdvcasbpmcefmef.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhoaGlqYmR2Y2FzYnBtY2VmbWVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwMjE1NjIsImV4cCI6MjA5NjU5NzU2Mn0.X62bsKGeYVxJ1td8n71mVnY-33iHvlR5a3p56drT3oQ";
-
-const sb = {
-  async select() {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/participants?select=*&order=registered_at.asc`, {
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
-    });
-    return r.json();
-  },
-  async insert(row) {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/participants`, {
-      method: "POST",
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=representation" },
-      body: JSON.stringify(row)
-    });
-    return r.json();
-  },
-  async update(id, patch) {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/participants?id=eq.${id}`, {
-      method: "PATCH",
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "return=representation" },
-      body: JSON.stringify(patch)
-    });
-    return r.json();
-  },
-  async delete(id) {
-    await fetch(`${SUPABASE_URL}/rest/v1/participants?id=eq.${id}`, {
-      method: "DELETE",
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
-    });
-  },
-  async deleteAll() {
-    await fetch(`${SUPABASE_URL}/rest/v1/participants?id=gt.0`, {
-      method: "DELETE",
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
-    });
-  }
-};
-
-// ── Teams ─────────────────────────────────────────────────────────────────────
-const TEAMS = [
-  { id: "spain",       name: "إسبانيا",          en: "Spain",        flag: "🇪🇸", odds: 18.2 },
-  { id: "france",      name: "فرنسا",             en: "France",       flag: "🇫🇷", odds: 17.0 },
-  { id: "england",     name: "إنجلترا",           en: "England",      flag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", odds: 12.5 },
-  { id: "brazil",      name: "البرازيل",          en: "Brazil",       flag: "🇧🇷", odds: 11.1 },
-  { id: "portugal",    name: "البرتغال",          en: "Portugal",     flag: "🇵🇹", odds: 9.5  },
-  { id: "argentina",   name: "الأرجنتين",         en: "Argentina",    flag: "🇦🇷", odds: 9.5  },
-  { id: "germany",     name: "ألمانيا",           en: "Germany",      flag: "🇩🇪", odds: 6.5  },
-  { id: "netherlands", name: "هولندا",            en: "Netherlands",  flag: "🇳🇱", odds: 4.8  },
-  { id: "morocco",     name: "المغرب",            en: "Morocco",      flag: "🇲🇦", odds: 3.0  },
-  { id: "belgium",     name: "بلجيكا",            en: "Belgium",      flag: "🇧🇪", odds: 2.5  },
-  { id: "croatia",     name: "كرواتيا",           en: "Croatia",      flag: "🇭🇷", odds: 1.5  },
-  { id: "uruguay",     name: "أوروغواي",          en: "Uruguay",      flag: "🇺🇾", odds: 1.5  },
-  { id: "colombia",    name: "كولومبيا",          en: "Colombia",     flag: "🇨🇴", odds: 1.3  },
-  { id: "italy",       name: "إيطاليا",           en: "Italy",        flag: "🇮🇹", odds: 1.2  },
-  { id: "usa",         name: "الولايات المتحدة",  en: "USA",          flag: "🇺🇸", odds: 1.8  },
-  { id: "mexico",      name: "المكسيك",           en: "Mexico",       flag: "🇲🇽", odds: 1.6  },
-  { id: "japan",       name: "اليابان",           en: "Japan",        flag: "🇯🇵", odds: 0.9  },
-  { id: "senegal",     name: "السنغال",           en: "Senegal",      flag: "🇸🇳", odds: 0.7  },
-  { id: "southkorea",  name: "كوريا الجنوبية",   en: "South Korea",  flag: "🇰🇷", odds: 0.6  },
-  { id: "denmark",     name: "الدنمارك",          en: "Denmark",      flag: "🇩🇰", odds: 0.8  },
-  { id: "switzerland", name: "سويسرا",            en: "Switzerland",  flag: "🇨🇭", odds: 0.7  },
-  { id: "australia",   name: "أستراليا",          en: "Australia",    flag: "🇦🇺", odds: 0.4  },
-  { id: "ecuador",     name: "الإكوادور",         en: "Ecuador",      flag: "🇪🇨", odds: 0.4  },
-  { id: "austria",     name: "النمسا",            en: "Austria",      flag: "🇦🇹", odds: 0.5  },
-  { id: "saudiarabia", name: "السعودية",          en: "Saudi Arabia", flag: "🇸🇦", odds: 0.3  },
-];
-
-const MAX_PER_TEAM = 3;
-const JERSEY_SIZES = ["XS","S","M","L","XL","XXL","XXXL"];
-
-const TEAM_JERSEYS = {
-  spain:       { home: { color:"#c60b1e", accent:"#f1bf00", label:"أحمر" },   away: { color:"#002fa7", accent:"#ffffff", label:"أزرق داكن" },  third: { color:"#000000", accent:"#c60b1e", label:"أسود" } },
-  france:      { home: { color:"#002395", accent:"#ed2939", label:"أزرق" },   away: { color:"#ffffff", accent:"#002395", label:"أبيض" },       third: { color:"#ed2939", accent:"#002395", label:"أحمر" } },
-  england:     { home: { color:"#ffffff", accent:"#cf111a", label:"أبيض" },   away: { color:"#1e3a5f", accent:"#ffffff", label:"أزرق كحلي" },  third: { color:"#cf111a", accent:"#ffffff", label:"أحمر" } },
-  brazil:      { home: { color:"#f7d000", accent:"#009c3b", label:"أصفر" },   away: { color:"#009c3b", accent:"#f7d000", label:"أخضر" },       third: { color:"#002776", accent:"#f7d000", label:"أزرق" } },
-  portugal:    { home: { color:"#8b0000", accent:"#006600", label:"أحمر داكن" }, away: { color:"#006600", accent:"#8b0000", label:"أخضر" },   third: { color:"#ffffff", accent:"#8b0000", label:"أبيض" } },
-  argentina:   { home: { color:"#74acdf", accent:"#ffffff", label:"أزرق فاتح" }, away: { color:"#ffffff", accent:"#74acdf", label:"أبيض" },   third: { color:"#2d2d2d", accent:"#74acdf", label:"رمادي داكن" } },
-  germany:     { home: { color:"#ffffff", accent:"#000000", label:"أبيض" },   away: { color:"#000000", accent:"#ffffff", label:"أسود" },       third: { color:"#d40000", accent:"#000000", label:"أحمر" } },
-  netherlands: { home: { color:"#ff6600", accent:"#ffffff", label:"برتقالي" }, away: { color:"#002fa7", accent:"#ff6600", label:"أزرق" },      third: { color:"#ffffff", accent:"#ff6600", label:"أبيض" } },
-  morocco:     { home: { color:"#c1272d", accent:"#006233", label:"أحمر" },   away: { color:"#ffffff", accent:"#c1272d", label:"أبيض" },       third: { color:"#006233", accent:"#c1272d", label:"أخضر" } },
-  belgium:     { home: { color:"#1a1a1a", accent:"#ef3340", label:"أسود" },   away: { color:"#ef3340", accent:"#1a1a1a", label:"أحمر" },       third: { color:"#0032a0", accent:"#ef3340", label:"أزرق" } },
-  croatia:     { home: { color:"#ff0000", accent:"#ffffff", label:"أحمر مربعات" }, away: { color:"#002868", accent:"#ff0000", label:"أزرق داكن" }, third: { color:"#ffffff", accent:"#002868", label:"أبيض" } },
-  uruguay:     { home: { color:"#5aaad5", accent:"#ffffff", label:"أزرق سماوي" }, away: { color:"#000000", accent:"#5aaad5", label:"أسود" },   third: { color:"#ffffff", accent:"#5aaad5", label:"أبيض" } },
-  colombia:    { home: { color:"#fcd116", accent:"#003087", label:"أصفر" },   away: { color:"#003087", accent:"#fcd116", label:"أزرق" },       third: { color:"#ce1126", accent:"#fcd116", label:"أحمر" } },
-  italy:       { home: { color:"#003399", accent:"#ffffff", label:"أزرق أزوري" }, away: { color:"#ffffff", accent:"#003399", label:"أبيض" },   third: { color:"#000000", accent:"#003399", label:"أسود" } },
-  usa:         { home: { color:"#ffffff", accent:"#002868", label:"أبيض" },   away: { color:"#002868", accent:"#bf0a30", label:"أزرق كحلي" }, third: { color:"#bf0a30", accent:"#ffffff", label:"أحمر" } },
-  mexico:      { home: { color:"#006847", accent:"#ffffff", label:"أخضر" },   away: { color:"#ffffff", accent:"#006847", label:"أبيض" },       third: { color:"#ce1126", accent:"#006847", label:"أحمر" } },
-  japan:       { home: { color:"#00205b", accent:"#bc002d", label:"أزرق سامورائي" }, away: { color:"#ffffff", accent:"#00205b", label:"أبيض" }, third: { color:"#bc002d", accent:"#00205b", label:"أحمر" } },
-  senegal:     { home: { color:"#00853f", accent:"#fdef42", label:"أخضر" },   away: { color:"#ffffff", accent:"#00853f", label:"أبيض" },       third: { color:"#e31b23", accent:"#fdef42", label:"أحمر" } },
-  southkorea:  { home: { color:"#cd2e3a", accent:"#003478", label:"أحمر" },   away: { color:"#003478", accent:"#cd2e3a", label:"أزرق داكن" }, third: { color:"#ffffff", accent:"#cd2e3a", label:"أبيض" } },
-  denmark:     { home: { color:"#c60c30", accent:"#ffffff", label:"أحمر" },   away: { color:"#ffffff", accent:"#c60c30", label:"أبيض" },       third: { color:"#000000", accent:"#c60c30", label:"أسود" } },
-  switzerland: { home: { color:"#ff0000", accent:"#ffffff", label:"أحمر" },   away: { color:"#ffffff", accent:"#ff0000", label:"أبيض" },       third: { color:"#1a1a1a", accent:"#ff0000", label:"أسود" } },
-  australia:   { home: { color:"#00843d", accent:"#ffd700", label:"أخضر" },   away: { color:"#ffffff", accent:"#00843d", label:"أبيض" },       third: { color:"#002868", accent:"#ffd700", label:"أزرق" } },
-  ecuador:     { home: { color:"#ffd100", accent:"#003087", label:"أصفر" },   away: { color:"#003087", accent:"#ffd100", label:"أزرق" },       third: { color:"#ce1126", accent:"#ffd100", label:"أحمر" } },
-  austria:     { home: { color:"#ed2939", accent:"#ffffff", label:"أحمر" },   away: { color:"#ffffff", accent:"#ed2939", label:"أبيض" },       third: { color:"#1a1a1a", accent:"#ed2939", label:"أسود" } },
-  saudiarabia: { home: { color:"#006c35", accent:"#ffffff", label:"أخضر" },   away: { color:"#ffffff", accent:"#006c35", label:"أبيض" },       third: { color:"#1a1a1a", accent:"#006c35", label:"أسود" } },
-};
-
-const JERSEY_KIT_TYPES = [
-  { id: "home",  label: "الطقم الأول"   },
-  { id: "away",  label: "الطقم الثاني" },
-  { id: "third", label: "الطقم الثالث" },
-];
-
-// ── Jersey Image ──────────────────────────────────────────────────────────────
-const jerseyImageCache = {};
-
-async function fetchJerseyImage(teamId, kitType, teamName, teamEn) {
-  const cacheKey = `${teamId}_${kitType}`;
-  if (jerseyImageCache[cacheKey]) return jerseyImageCache[cacheKey];
-  const kit = TEAM_JERSEYS[teamId]?.[kitType] || { color:"#888", accent:"#fff", label:"" };
-  const kitLabels = { home:"home first kit", away:"away second kit", third:"third alternate kit" };
-  try {
-    const r = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514", max_tokens: 2000,
-        messages: [{ role: "user", content: `Create a detailed, realistic SVG illustration of a ${teamEn} ${kitLabels[kitType]} football jersey for World Cup 2026.
-Main color: ${kit.color}
-Accent/trim color: ${kit.accent}
-Style: ${kit.label}
-${teamId === "croatia" && kitType === "home" ? "Pattern: red and white checkerboard squares" : ""}
-${teamId === "argentina" && kitType === "home" ? "Pattern: light blue and white vertical stripes" : ""}
-Return ONLY a valid SVG (viewBox="0 0 200 220") of just the jersey shirt, front view, no player, detailed fabric texture.` }]
-      })
-    });
-    const d = await r.json();
-    const text = d.content?.[0]?.text || "";
-    const svgMatch = text.match(/<svg[\s\S]*<\/svg>/i);
-    if (svgMatch) {
-      jerseyImageCache[cacheKey] = { type: "svg", data: svgMatch[0] };
-      return jerseyImageCache[cacheKey];
-    }
-  } catch {}
-  return null;
-}
-
-function JerseyCard({ teamId, kitType, teamName, teamEn, size = 110, showName = "", showNumber = "" }) {
-  const [imgData, setImgData] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const kit = TEAM_JERSEYS[teamId]?.[kitType] || { color:"#888", accent:"#fff", label:"" };
-
-  useEffect(() => {
-    if (!teamId) return;
-    const cacheKey = `${teamId}_${kitType}`;
-    if (jerseyImageCache[cacheKey]) { setImgData(jerseyImageCache[cacheKey]); return; }
-    setLoading(true);
-    fetchJerseyImage(teamId, kitType, teamName, teamEn).then(data => {
-      setImgData(data); setLoading(false);
-    });
-  }, [teamId, kitType]);
-
-  const FallbackSVG = () => {
-    const isChecker = teamId === "croatia" && kitType === "home";
-    const isStripes = (teamId === "argentina" || teamId === "uruguay") && kitType === "home";
-    const isPinstripe = (teamId === "germany" || teamId === "spain") && kitType === "home";
-    return (
-      <svg width={size} height={size*1.1} viewBox="0 0 200 220" xmlns="http://www.w3.org/2000/svg"
-        style={{filter:"drop-shadow(0 6px 16px rgba(0,0,0,0.6))"}}>
-        <defs>
-          {isChecker && <pattern id={`chk_${kitType}`} x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse"><rect width="10" height="10" fill={kit.color}/><rect x="10" width="10" height="10" fill={kit.accent}/><rect y="10" width="10" height="10" fill={kit.accent}/><rect x="10" y="10" width="10" height="10" fill={kit.color}/></pattern>}
-          {isStripes && <pattern id={`str_${kitType}`} x="0" y="0" width="24" height="1" patternUnits="userSpaceOnUse"><rect width="14" height="220" fill={kit.color}/><rect x="14" width="10" height="220" fill={kit.accent}/></pattern>}
-          {isPinstripe && <pattern id={`pin_${kitType}`} x="0" y="0" width="12" height="1" patternUnits="userSpaceOnUse"><rect width="10" height="220" fill={kit.color}/><rect x="10" width="2" height="220" fill={kit.accent} opacity="0.3"/></pattern>}
-          <filter id={`shadow_${kitType}`}><feDropShadow dx="2" dy="4" stdDeviation="3" floodOpacity="0.4"/></filter>
-          <linearGradient id={`shine_${kitType}`} x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="white" stopOpacity="0.15"/><stop offset="50%" stopColor="white" stopOpacity="0"/><stop offset="100%" stopColor="black" stopOpacity="0.1"/></linearGradient>
-        </defs>
-        <path d="M20 38 L8 110 L62 118 L70 40 Z" fill={isChecker?`url(#chk_${kitType})`:isStripes?`url(#str_${kitType})`:isPinstripe?`url(#pin_${kitType})`:kit.color} stroke={kit.accent} strokeWidth="2" filter={`url(#shadow_${kitType})`}/>
-        <path d="M180 38 L192 110 L138 118 L130 40 Z" fill={isChecker?`url(#chk_${kitType})`:isStripes?`url(#str_${kitType})`:isPinstripe?`url(#pin_${kitType})`:kit.color} stroke={kit.accent} strokeWidth="2"/>
-        <path d="M70 40 L62 118 L55 205 L145 205 L138 118 L130 40 Q100 58 70 40 Z" fill={isChecker?`url(#chk_${kitType})`:isStripes?`url(#str_${kitType})`:isPinstripe?`url(#pin_${kitType})`:kit.color} stroke={kit.accent} strokeWidth="2" filter={`url(#shadow_${kitType})`}/>
-        <path d="M70 40 L62 118 L55 205 L145 205 L138 118 L130 40 Q100 58 70 40 Z" fill={`url(#shine_${kitType})`}/>
-        <path d="M20 38 L8 110 L62 118 L70 40 Z" fill={`url(#shine_${kitType})`}/>
-        <path d="M180 38 L192 110 L138 118 L130 40 Z" fill={`url(#shine_${kitType})`}/>
-        <path d="M82 42 Q100 62 118 42" fill="none" stroke={kit.accent} strokeWidth="5" strokeLinecap="round"/>
-        <path d="M84 42 Q100 56 116 42" fill={kit.color} stroke={kit.accent} strokeWidth="1"/>
-        <line x1="24" y1="58" x2="16" y2="88" stroke={kit.accent} strokeWidth="6" opacity="0.7" strokeLinecap="round"/>
-        <line x1="176" y1="58" x2="184" y2="88" stroke={kit.accent} strokeWidth="6" opacity="0.7" strokeLinecap="round"/>
-        <circle cx="76" cy="85" r="10" fill={kit.accent} opacity="0.7"/>
-        <text x="76" y="89" textAnchor="middle" fontSize="9" fill={kit.color} fontWeight="900">⚽</text>
-        {showNumber && <text x="100" y="165" textAnchor="middle" fontSize="44" fontWeight="900" fill={kit.accent} fontFamily="'Bebas Neue',Arial,sans-serif">{showNumber}</text>}
-        {showName && <text x="100" y="130" textAnchor="middle" fontSize="13" fontWeight="700" fill={kit.accent} fontFamily="Cairo,Arial,sans-serif" letterSpacing="2">{showName.slice(0,9).toUpperCase()}</text>}
-        <line x1="56" y1="204" x2="144" y2="204" stroke={kit.accent} strokeWidth="3" opacity="0.6"/>
-      </svg>
-    );
-  };
-
-  if (loading) return <div style={{width:size,height:size*1.1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8}}><div style={{fontSize:"1.6rem",animation:"spin 1s linear infinite"}}>⟳</div><div style={{fontSize:"0.6rem",color:"rgba(255,255,255,0.4)"}}>جاري التحميل...</div></div>;
-  if (imgData?.type === "svg") return <div style={{width:size,height:size*1.1,display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}><div dangerouslySetInnerHTML={{__html: imgData.data}} style={{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center"}}/>{(showName||showNumber)&&<div style={{position:"absolute",bottom:"14%",left:0,right:0,textAlign:"center"}}>{showName&&<div style={{fontSize:"0.55rem",fontWeight:700,color:kit.accent,letterSpacing:1,opacity:0.9}}>{showName.slice(0,9).toUpperCase()}</div>}{showNumber&&<div style={{fontSize:"1.4rem",fontWeight:900,color:kit.accent,fontFamily:"'Bebas Neue',sans-serif",lineHeight:1}}>{showNumber}</div>}</div>}</div>;
-  return <FallbackSVG />;
-}
-
-// ── Countdown ─────────────────────────────────────────────────────────────────
-const REGISTRATION_DEADLINE = new Date("2026-06-11T15:00:00Z");
-
-function useCountdown() {
-  const [timeLeft, setTimeLeft] = useState(getTimeLeft());
-  function getTimeLeft() {
-    const diff = REGISTRATION_DEADLINE - Date.now();
-    if (diff <= 0) return null;
-    const d = Math.floor(diff / 86400000);
-    const h = Math.floor((diff % 86400000) / 3600000);
-    const m = Math.floor((diff % 3600000) / 60000);
-    const s = Math.floor((diff % 60000) / 1000);
-    return { d, h, m, s, diff };
-  }
-  useEffect(() => {
-    const t = setInterval(() => setTimeLeft(getTimeLeft()), 1000);
-    return () => clearInterval(t);
-  }, []);
-  return timeLeft;
-}
-
-function CountdownBanner() {
-  const t = useCountdown();
-  if (!t) return <div style={{background:"rgba(255,60,60,0.15)",border:"1px solid rgba(255,60,60,0.4)",borderRadius:12,padding:"10px 16px",textAlign:"center",marginBottom:16,fontSize:"0.85rem",color:"#ff8888"}}>🔒 انتهى وقت التسجيل — البطولة انطلقت!</div>;
-  const urgent = t.diff < 86400000;
-  return (
-    <div style={{background:urgent?"rgba(255,60,60,0.12)":"rgba(212,175,55,0.1)",border:`1px solid ${urgent?"rgba(255,60,60,0.4)":"rgba(212,175,55,0.3)"}`,borderRadius:12,padding:"12px 16px",marginBottom:16,textAlign:"center"}}>
-      <div style={{fontSize:"0.72rem",color:"var(--muted)",marginBottom:6,letterSpacing:1}}>⏱ يُغلق التسجيل عند انطلاق أول مباراة</div>
-      <div style={{display:"flex",justifyContent:"center",gap:10,alignItems:"center"}}>
-        {[{v:t.d,l:"يوم"},{v:t.h,l:"ساعة"},{v:t.m,l:"دقيقة"},{v:t.s,l:"ثانية"}].map(({v,l})=>(
-          <div key={l} style={{textAlign:"center"}}>
-            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:urgent?"2rem":"1.7rem",color:urgent?"#ff6666":"var(--gold)",lineHeight:1,textShadow:urgent?"0 0 16px rgba(255,80,80,0.5)":"0 0 12px rgba(212,175,55,0.5)",minWidth:42,background:"rgba(0,0,0,0.25)",borderRadius:8,padding:"4px 6px",border:`1px solid ${urgent?"rgba(255,60,60,0.3)":"rgba(212,175,55,0.2)"}`}}>{String(v).padStart(2,"0")}</div>
-            <div style={{fontSize:"0.6rem",color:"var(--muted)",marginTop:3}}>{l}</div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ── NEW: Supabase Realtime via WebSocket ──────────────────────────────────────
-function useSupabaseRealtime(onEvent) {
-  useEffect(() => {
-    let ws;
-    let hbInterval;
-    let retryTimeout;
-    let retries = 0;
-
-    function connect() {
-      try {
-        ws = new WebSocket(`wss://hhhijbdvcasbpmcefmef.supabase.co/realtime/v1/websocket?apikey=${SUPABASE_KEY}&vsn=1.0.0`);
-
-        ws.onopen = () => {
-          retries = 0;
-          ws.send(JSON.stringify({
-            topic: "realtime:public:participants",
-            event: "phx_join",
-            payload: {
-              config: {
-                broadcast: { self: false },
-                presence: { key: "" },
-                postgres_changes: [{ event: "*", schema: "public", table: "participants" }]
-              }
-            },
-            ref: "join_1"
-          }));
-          hbInterval = setInterval(() => {
-            if (ws.readyState === 1) ws.send(JSON.stringify({ topic: "phoenix", event: "heartbeat", payload: {}, ref: "hb" }));
-          }, 25000);
-        };
-
-        ws.onmessage = (e) => {
-          try {
-            const msg = JSON.parse(e.data);
-            if (msg.event === "postgres_changes" && msg.payload?.data) {
-              onEvent(msg.payload.data);
-            }
-          } catch {}
-        };
-
-        ws.onclose = () => {
-          clearInterval(hbInterval);
-          if (retries < 6) {
-            retryTimeout = setTimeout(connect, Math.min(2000 * Math.pow(1.5, retries), 30000));
-            retries++;
-          }
-        };
-
-        ws.onerror = () => ws.close();
-      } catch {}
-    }
-
-    connect();
-    return () => {
-      clearInterval(hbInterval);
-      clearTimeout(retryTimeout);
-      if (ws) ws.close();
-    };
-  }, []);
-}
-
-// ── NEW: Browser Notifications ────────────────────────────────────────────────
-function requestNotifPermission() {
-  if (typeof Notification !== "undefined" && Notification.permission === "default") {
-    Notification.requestPermission().catch(() => {});
-  }
-}
-
-function sendNotif(title, body) {
-  if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-    try { new Notification(title, { body, icon: "⚽" }); } catch {}
-  }
-}
-
-// ── NEW: Share Card ───────────────────────────────────────────────────────────
-function shareWhatsApp(p, prob) {
-  const text = `🏆 كأس العالم 2026 — بطاقة مشاركتي\n\n👤 ${p.name}\n${p.team_flag} ${p.team_name}\n📊 احتمال الفوز: ${prob}%\n👕 ${p.jersey?.name} #${p.jersey?.number}\n\nسجّل مشاركتك 👇\nhttps://wc2026-olive.vercel.app`;
-  window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
-}
-
-// ── NEW: CSV Export ───────────────────────────────────────────────────────────
-function exportCSV(participants) {
-  const BOM = "﻿";
-  const headers = ["الاسم","المنتخب","لون الطقم","المقاس","اسم الطباعة","رقم الطباعة","تاريخ التسجيل"];
-  const rows = participants.map(p => [
-    p.name,
-    `${p.team_flag} ${p.team_name}`,
-    p.jersey?.color || "",
-    p.jersey?.size || "",
-    p.jersey?.name || "",
-    p.jersey?.number || "",
-    p.registered_at ? new Date(p.registered_at).toLocaleDateString("ar-SA") : "-"
-  ]);
-  const csv = BOM + [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url; a.download = `WC2026_participants.csv`; a.click();
-  URL.revokeObjectURL(url);
-}
-
-// ── NEW: Winner Page ──────────────────────────────────────────────────────────
-function WinnerPage({ winnerTeamId, participants, odds, onClose }) {
-  const team = TEAMS.find(t => t.id === winnerTeamId);
-  const winners = participants.filter(p => p.team_id === winnerTeamId);
-  const losers = participants.filter(p => p.team_id !== winnerTeamId);
-
-  return (
-    <div style={{position:"fixed",inset:0,zIndex:1000,background:"linear-gradient(135deg,#042e12,#064e2a,#042e12)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:24,textAlign:"center",overflow:"auto",direction:"rtl"}}>
-      <style>{`@keyframes confettiFall{from{transform:translateY(-20px) rotate(0deg);opacity:1}to{transform:translateY(100vh) rotate(720deg);opacity:0}}@keyframes bounceIn{0%{transform:scale(0.3);opacity:0}60%{transform:scale(1.1)}100%{transform:scale(1);opacity:1}}`}</style>
-      {Array.from({length:20}).map((_,i)=>(
-        <div key={i} style={{position:"fixed",top:"-20px",left:`${Math.random()*100}%`,width:8,height:8,borderRadius:"50%",background:["#ffd700","#4cff88","#ff6b6b","#44ddff","#ff9f43"][i%5],animation:`confettiFall ${2+Math.random()*3}s ${Math.random()*2}s infinite`}}/>
-      ))}
-      <div style={{fontSize:"5rem",animation:"bounceIn 0.8s ease",marginBottom:12}}>🏆</div>
-      <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"clamp(2rem,8vw,4rem)",color:"#ffd700",letterSpacing:4,textShadow:"0 0 40px rgba(255,215,0,0.8)",marginBottom:8}}>الفائز بكأس العالم 2026</div>
-      <div style={{fontSize:"5rem",marginBottom:8}}>{team?.flag}</div>
-      <div style={{fontSize:"2rem",fontWeight:900,color:"#ffffff",marginBottom:24}}>{team?.name}</div>
-
-      {winners.length > 0 && (
-        <div style={{background:"rgba(255,215,0,0.12)",border:"2px solid #ffd700",borderRadius:20,padding:"20px 28px",marginBottom:20,maxWidth:400,width:"100%"}}>
-          <div style={{fontSize:"1rem",fontWeight:900,color:"#ffd700",marginBottom:12}}>🎉 المشاركون الفائزون</div>
-          {winners.map(w => (
-            <div key={w.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 0",borderBottom:"1px solid rgba(255,215,0,0.2)"}}>
-              {w.photo ? <img src={w.photo} style={{width:36,height:36,borderRadius:"50%",objectFit:"cover",border:"2px solid #ffd700"}}/> : <span style={{fontSize:"1.6rem"}}>{w.team_flag}</span>}
-              <div style={{textAlign:"right"}}>
-                <div style={{fontWeight:900,color:"#fff"}}>{w.name}</div>
-                <div style={{fontSize:"0.74rem",color:"#ffd700"}}>👕 {w.jersey?.name} #{w.jersey?.number} • {w.jersey?.size}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {losers.length > 0 && (
-        <div style={{background:"rgba(255,255,255,0.04)",borderRadius:14,padding:"12px 18px",marginBottom:20,maxWidth:400,width:"100%",fontSize:"0.82rem",color:"rgba(255,255,255,0.6)"}}>
-          <div style={{marginBottom:6,color:"rgba(255,255,255,0.8)"}}>💰 المشاركون الخاسرون ({losers.length} شخص) — يساهمون في تكلفة التيشرت</div>
-          {losers.map(l => <span key={l.id} style={{marginLeft:6}}>{l.team_flag} {l.name}</span>)}
-        </div>
-      )}
-
-      <button onClick={onClose} style={{background:"rgba(255,255,255,0.12)",border:"1px solid rgba(255,255,255,0.3)",borderRadius:12,padding:"10px 28px",color:"#fff",fontFamily:"Cairo,sans-serif",fontSize:"0.9rem",cursor:"pointer",marginTop:8}}>إغلاق</button>
-    </div>
-  );
-}
-
-// ── NEW: Stats Tab ────────────────────────────────────────────────────────────
-function StatsTab({ participants, odds }) {
-  const teamCounts = {};
-  participants.forEach(p => { teamCounts[p.team_id] = (teamCounts[p.team_id] || 0) + 1; });
-  const teamsWithParticipants = TEAMS.filter(t => teamCounts[t.id] > 0).sort((a,b) => (teamCounts[b.id]||0) - (teamCounts[a.id]||0));
-  const maxCount = Math.max(...Object.values(teamCounts), 1);
-
-  return (
-    <>
-      <div className="card">
-        <div className="card-title">📊 إحصائيات المشاركين</div>
-        <div className="card-sub">{participants.length} مشارك • {teamsWithParticipants.length} منتخب مختار</div>
-        {teamsWithParticipants.length === 0
-          ? <div className="empty"><div className="ei">📊</div><p>لا يوجد مشاركون بعد</p></div>
-          : teamsWithParticipants.map(team => {
-            const cnt = teamCounts[team.id] || 0;
-            const pct = Math.round((cnt / participants.length) * 100);
-            const barW = Math.round((cnt / maxCount) * 100);
-            const prob = odds[team.id] || team.odds;
-            return (
-              <div key={team.id} style={{marginBottom:14}}>
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:5}}>
-                  <div style={{display:"flex",alignItems:"center",gap:8}}>
-                    <span style={{fontSize:"1.4rem"}}>{team.flag}</span>
-                    <span style={{fontSize:"0.88rem",fontWeight:700}}>{team.name}</span>
-                  </div>
-                  <div style={{display:"flex",gap:12,alignItems:"center"}}>
-                    <span style={{fontSize:"0.75rem",color:"var(--muted)"}}>{pct}% من المشاركين</span>
-                    <span style={{fontSize:"0.82rem",fontWeight:900,color:"var(--gold)"}}>{cnt}/{MAX_PER_TEAM}</span>
-                  </div>
-                </div>
-                <div style={{height:10,background:"rgba(255,255,255,0.07)",borderRadius:5,overflow:"hidden"}}>
-                  <div style={{height:"100%",width:`${barW}%`,background:`linear-gradient(90deg,var(--gold),#b8962e)`,borderRadius:5,transition:"width 1s ease"}}/>
-                </div>
-                <div style={{display:"flex",gap:6,marginTop:4,flexWrap:"wrap"}}>
-                  {participants.filter(p => p.team_id === team.id).map(p => (
-                    <span key={p.id} style={{fontSize:"0.72rem",background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:6,padding:"2px 8px",color:"var(--white)"}}>{p.name}</span>
-                  ))}
-                </div>
-              </div>
-            );
-          })
-        }
-      </div>
-
-      <div className="card">
-        <div className="card-title" style={{fontSize:"1rem"}}>👕 توزيع المقاسات</div>
-        {(() => {
-          const sizes = {};
-          participants.forEach(p => { const s = p.jersey?.size||"?"; sizes[s] = (sizes[s]||0)+1; });
-          return Object.entries(sizes).sort((a,b)=>b[1]-a[1]).map(([s,c]) => (
-            <div key={s} style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
-              <span style={{minWidth:50,fontWeight:700,color:"var(--gold)"}}>{s}</span>
-              <div style={{flex:1,height:8,background:"rgba(255,255,255,0.07)",borderRadius:4,overflow:"hidden"}}>
-                <div style={{height:"100%",width:`${(c/participants.length)*100}%`,background:"linear-gradient(90deg,#44ddff,#0099cc)",borderRadius:4}}/>
-              </div>
-              <span style={{fontSize:"0.78rem",color:"var(--muted)"}}>{c} شخص</span>
-            </div>
-          ));
-        })()}
-      </div>
-    </>
-  );
-}
-
-// ── NEW: جلب نتائج المباريات عبر ESPN API (بدون مفتاح) ───────────────────────
-const TEAM_FLAGS_MAP = {
-  "Mexico":"🇲🇽","South Africa":"🇿🇦","South Korea":"🇰🇷","Korea Republic":"🇰🇷","Czechia":"🇨🇿","Czech Republic":"🇨🇿",
-  "Canada":"🇨🇦","Bosnia and Herzegovina":"🇧🇦","Bosnia":"🇧🇦","Qatar":"🇶🇦","Switzerland":"🇨🇭",
+// ── جلب النتائج عبر ESPN API (بدون مفتاح) ────────────
+// نفس TEAM_FLAGS_MAP من App.jsx
+const FLAGS = {
+  "Mexico":"🇲🇽","South Africa":"🇿🇦","Korea Republic":"🇰🇷","South Korea":"🇰🇷","Czechia":"🇨🇿","Czech Republic":"🇨🇿",
+  "Canada":"🇨🇦","Bosnia and Herzegovina":"🇧🇦","Qatar":"🇶🇦","Switzerland":"🇨🇭",
   "Brazil":"🇧🇷","Morocco":"🇲🇦","Haiti":"🇭🇹","Scotland":"🏴󠁧󠁢󠁳󠁣󠁴󠁿",
   "United States":"🇺🇸","USA":"🇺🇸","Paraguay":"🇵🇾","Australia":"🇦🇺","Türkiye":"🇹🇷","Turkey":"🇹🇷",
   "Germany":"🇩🇪","Curaçao":"🇨🇼","Côte d'Ivoire":"🇨🇮","Ivory Coast":"🇨🇮","Ecuador":"🇪🇨",
@@ -461,1018 +22,783 @@ const TEAM_FLAGS_MAP = {
   "England":"🏴󠁧󠁢󠁥󠁮󠁧󠁿","Croatia":"🇭🇷","Ghana":"🇬🇭","Panama":"🇵🇦",
 };
 
-function getFlag(name) {
-  return TEAM_FLAGS_MAP[name] || "🏳️";
-}
+// خريطة أسماء الفرق → team IDs في التطبيق
+const NAME_TO_ID = {
+  "Mexico":"mexico","South Africa":"southafrica","Korea Republic":"southkorea","South Korea":"southkorea",
+  "Czechia":"czech","Czech Republic":"czech","Canada":"canada","Bosnia and Herzegovina":"bosnia",
+  "Qatar":"qatar","Switzerland":"switzerland","Brazil":"brazil","Morocco":"morocco",
+  "Haiti":"haiti","Scotland":"scotland","United States":"usa","USA":"usa",
+  "Paraguay":"paraguay","Australia":"australia","Türkiye":"turkey","Turkey":"turkey",
+  "Germany":"germany","Curaçao":"curacao","Côte d'Ivoire":"ivorycoast","Ivory Coast":"ivorycoast",
+  "Ecuador":"ecuador","Netherlands":"netherlands","Japan":"japan","Sweden":"sweden","Tunisia":"tunisia",
+  "Belgium":"belgium","Egypt":"egypt","Iran":"iran","New Zealand":"newzealand",
+  "Spain":"spain","Cape Verde":"capeverde","Saudi Arabia":"saudiarabia","Uruguay":"uruguay",
+  "France":"france","Senegal":"senegal","Iraq":"iraq","Norway":"norway",
+  "Argentina":"argentina","Algeria":"algeria","Austria":"austria","Jordan":"jordan",
+  "Portugal":"portugal","DR Congo":"drcongo","Uzbekistan":"uzbekistan","Colombia":"colombia",
+  "England":"england","Croatia":"croatia","Ghana":"ghana","Panama":"panama",
+};
 
-async function fetchMatchData() {
+// خريطة المجموعات
+const TEAM_GROUP = {
+  mexico:"A",southafrica:"A",southkorea:"A",czech:"A",
+  canada:"B",bosnia:"B",qatar:"B",switzerland:"B",
+  brazil:"C",morocco:"C",haiti:"C",scotland:"C",
+  usa:"D",paraguay:"D",australia:"D",turkey:"D",
+  germany:"E",curacao:"E",ivorycoast:"E",ecuador:"E",
+  netherlands:"F",japan:"F",sweden:"F",tunisia:"F",
+  belgium:"G",egypt:"G",iran:"G",newzealand:"G",
+  spain:"H",capeverde:"H",saudiarabia:"H",uruguay:"H",
+  france:"I",senegal:"I",iraq:"I",norway:"I",
+  argentina:"J",algeria:"J",austria:"J",jordan:"J",
+  portugal:"K",drcongo:"K",uzbekistan:"K",colombia:"K",
+  england:"L",croatia:"L",ghana:"L",panama:"L",
+};
+
+async function fetchLiveMatchResults() {
+  // نجلب من ESPN API مباشرة — بدون مفتاح
   const fmtDate = (d) => d.toISOString().slice(0,10).replace(/-/g,'');
-  const todayStr = fmtDate(new Date());
-  const yestStr = fmtDate(new Date(Date.now() - 86400000));
+  const results = {};
 
-  const parseESPN = (data) => {
-    if (!data?.events?.length) return [];
-    return data.events.map(e => {
-      const comp = e.competitions?.[0];
-      const home = comp?.competitors?.find(c => c.homeAway === 'home');
-      const away = comp?.competitors?.find(c => c.homeAway === 'away');
-      const st = e.status?.type?.state; // "pre" | "in" | "post"
-      const stName = e.status?.type?.name; // "STATUS_FINAL" etc
-      const homeName = home?.team?.displayName || home?.team?.shortDisplayName || "؟";
-      const awayName = away?.team?.displayName || away?.team?.shortDisplayName || "؟";
-      const isLive = st === "in";
-      const isDone = st === "post";
-      const matchTime = new Date(e.date).toLocaleTimeString('ar-SA', {
-        hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Riyadh'
-      });
-      const note = e.status?.displayClock || "";
-      return {
-        home: homeName, homeFlag: getFlag(homeName),
-        away: awayName, awayFlag: getFlag(awayName),
-        homeScore: !isDone && !isLive ? null : parseInt(home?.score ?? 0),
-        awayScore: !isDone && !isLive ? null : parseInt(away?.score ?? 0),
-        time: matchTime,
-        note: isLive ? `🔴 ${note}` : "",
-        status: isDone ? "finished" : isLive ? "live" : "upcoming",
-        group: comp?.groups?.name || comp?.notes?.[0]?.headline || ""
-      };
-    }).filter(Boolean);
-  };
+  // نجلب آخر 14 يوم (فترة دور المجموعات)
+  const dates = [];
+  for (let i = 0; i <= 20; i++) {
+    dates.push(fmtDate(new Date(Date.now() - i * 86400000)));
+  }
 
   try {
-    const [tRes, yRes] = await Promise.all([
-      fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=${todayStr}`),
-      fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=${yestStr}`)
-    ]);
-    const [tData, yData] = await Promise.all([tRes.json(), yRes.json()]);
-    return { today: parseESPN(tData), yesterday: parseESPN(yData) };
-  } catch { return null; }
-}
+    // نجلب كل مباريات البطولة حتى اليوم
+    const uniqueDates = [...new Set(dates)];
+    const responses = await Promise.all(
+      uniqueDates.slice(0, 10).map(d =>
+        fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=${d}`)
+          .then(r => r.json())
+          .catch(() => null)
+      )
+    );
 
-// ── NEW: MatchesTab Component ─────────────────────────────────────────────────
-function MatchesTab({ matchData, loading, lastUpdate, onRefresh, fetchingNow }) {
-  const statusColor = (s) => s==="finished"?"#4cff88":s==="live"?"#ff6b6b":"#a0b8a8";
-  const statusLabel = (s) => s==="finished"?"✅ انتهت":s==="live"?"🔴 مباشر":"⏳ قريباً";
+    for (const data of responses) {
+      if (!data?.events) continue;
+      for (const e of data.events) {
+        if (e.status?.type?.state !== "post") continue; // فقط المنتهية
+        const comp = e.competitions?.[0];
+        const home = comp?.competitors?.find(c => c.homeAway === 'home');
+        const away = comp?.competitors?.find(c => c.homeAway === 'away');
+        if (!home || !away) continue;
 
-  const MatchCard = ({ m }) => (
-    <div style={{background:"var(--card-bg)",border:`1px solid ${m.status==="live"?"rgba(255,107,107,0.4)":"rgba(48,79,254,0.15)"}`,borderRadius:14,padding:"14px 16px",marginBottom:10,
-      boxShadow:m.status==="live"?"0 0 20px rgba(255,107,107,0.15)":"none"}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-        <span style={{fontSize:"0.72rem",color:"var(--muted)"}}>المجموعة {m.group}</span>
-        <span style={{fontSize:"0.72rem",color:statusColor(m.status),fontWeight:700}}>{statusLabel(m.status)}</span>
-        <span style={{fontSize:"0.72rem",color:"var(--gold)"}}>{m.time} 🕐</span>
-      </div>
-      <div style={{display:"flex",alignItems:"center",gap:10}}>
-        <div style={{flex:1,textAlign:"right"}}>
-          <div style={{fontSize:"1rem",fontWeight:900}}>{m.homeFlag} {m.home}</div>
-        </div>
-        <div style={{minWidth:70,textAlign:"center"}}>
-          {m.status==="upcoming"
-            ? <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.4rem",color:"var(--muted)"}}>VS</div>
-            : <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"2rem",color:m.status==="live"?"#ff6b6b":"#4cff88",lineHeight:1}}>
-                {m.homeScore} — {m.awayScore}
-              </div>
-          }
-        </div>
-        <div style={{flex:1}}>
-          <div style={{fontSize:"1rem",fontWeight:900}}>{m.away} {m.awayFlag}</div>
-        </div>
-      </div>
-    </div>
-  );
+        const homeId = NAME_TO_ID[home.team?.displayName] || NAME_TO_ID[home.team?.shortDisplayName];
+        const awayId = NAME_TO_ID[away.team?.displayName] || NAME_TO_ID[away.team?.shortDisplayName];
+        if (!homeId || !awayId) continue;
 
-  return (
-    <>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:"var(--card-bg)",border:"1px solid rgba(48,79,254,0.2)",borderRadius:10,padding:"9px 13px",marginBottom:14}}>
-        <div style={{fontSize:"0.76rem",color:"var(--muted)"}}>
-          {lastUpdate ? `آخر تحديث: ${lastUpdate}` : "جاري التحديث..."}
-          <span style={{marginRight:8,fontSize:"0.68rem",color:"#4cff88"}}>⟳ كل 5 دقائق</span>
-        </div>
-        <button onClick={onRefresh} disabled={fetchingNow}
-          style={{background:"rgba(48,79,254,0.15)",border:"1px solid rgba(48,79,254,0.4)",borderRadius:8,color:"#7b9cff",fontFamily:"Cairo,sans-serif",fontSize:"0.73rem",fontWeight:700,padding:"5px 11px",cursor:fetchingNow?"not-allowed":"pointer",transition:"all .2s"}}>
-          {fetchingNow ? <span style={{display:"inline-block",animation:"spin 1s linear infinite"}}>⟳</span> : "⟳"} تحديث
-        </button>
-      </div>
-
-      {loading
-        ? <div style={{textAlign:"center",padding:"50px 20px",color:"var(--muted)"}}>
-            <div style={{fontSize:"2rem",animation:"spin 1s linear infinite",display:"block",marginBottom:12}}>⟳</div>
-            جاري جلب النتائج من الإنترنت...
-          </div>
-        : !matchData
-          ? <div style={{textAlign:"center",padding:"50px 20px",color:"var(--muted)"}}>
-              <div style={{fontSize:"2.5rem",marginBottom:10}}>⚽</div>
-              <p>اضغط "تحديث" لجلب نتائج اليوم</p>
-            </div>
-          : <>
-              {matchData.today?.length > 0 && (
-                <div className="card" style={{marginBottom:14}}>
-                  <div className="card-title" style={{fontSize:"1rem",marginBottom:12}}>⚽ مباريات اليوم — {new Date().toLocaleDateString("ar-SA",{weekday:"long",day:"numeric",month:"long"})}</div>
-                  {matchData.today.map((m,i) => <MatchCard key={i} m={m}/>)}
-                </div>
-              )}
-              {matchData.yesterday?.length > 0 && (
-                <div className="card">
-                  <div className="card-title" style={{fontSize:"1rem",marginBottom:12}}>📋 نتائج أمس</div>
-                  {matchData.yesterday.map((m,i) => <MatchCard key={i} m={m}/>)}
-                </div>
-              )}
-            </>
+        const group = TEAM_GROUP[homeId] || TEAM_GROUP[awayId] || "?";
+        const key = `${group}_${homeId}_${awayId}`;
+        results[key] = {
+          homeScore: parseInt(home.score ?? 0),
+          awayScore: parseInt(away.score ?? 0),
+          played: true
+        };
       }
-    </>
-  );
-}
-
-// ── Claude API helpers ────────────────────────────────────────────────────────
-async function fetchLiveOdds() {
-  try {
-    const r = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514", max_tokens: 1000,
-        tools: [{ type: "web_search_20250305", name: "web_search" }],
-        messages: [{ role: "user", content: `Search for the latest 2026 FIFA World Cup winner odds/probabilities from BetMGM, DraftKings, or ESPN today. Return ONLY a JSON object with these exact team IDs as keys and win probability % as values: spain, france, england, brazil, portugal, argentina, germany, netherlands, morocco, belgium, croatia, uruguay, colombia, italy, usa, mexico, japan, senegal, southkorea, denmark, switzerland, australia, ecuador, austria, saudiarabia. Return ONLY the JSON, nothing else.` }]
-      })
-    });
-    const d = await r.json();
-    const tb = d.content?.find(b => b.type === "text");
-    if (!tb) return null;
-    const m = tb.text.replace(/```json|```/g,"").trim().match(/\{[\s\S]*\}/);
-    return m ? JSON.parse(m[0]) : null;
-  } catch { return null; }
-}
-
-async function generateJerseyPreview(name, number, teamName, teamFlag, color, size) {
-  try {
-    const r = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514", max_tokens: 600,
-        messages: [{ role: "user", content: `أنت مساعد مسابقة كأس العالم. المشارك "${name}" اختار منتخب "${teamFlag} ${teamName}" وطلب الطقم ${color} بمقاس ${size} مع الاسم "${name}" والرقم ${number} مطبوعَين عليه. اكتب وصفاً قصيراً ومتحمساً باللغة العربية (3-4 جمل) يصف شكله وهو يلبس هذا التيشرت ويحتفل بفوز منتخبه في كأس العالم 2026. اجعله شخصياً وممتعاً.` }]
-      })
-    });
-    const d = await r.json();
-    return d.content?.[0]?.text || null;
-  } catch { return null; }
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function probColor(p) { return p >= 12 ? "#4cff88" : p >= 6 ? "#44ddff" : p >= 2 ? "#ffcc44" : "#ff8866"; }
-function barGrad(p) { return p >= 12 ? "linear-gradient(90deg,#4cff88,#00cc66)" : p >= 6 ? "linear-gradient(90deg,#44ddff,#0099cc)" : p >= 2 ? "linear-gradient(90deg,#ffcc44,#cc8800)" : "linear-gradient(90deg,#ff8866,#cc4422)"; }
-function tierClass(p) { return p >= 12 ? "tier-top" : p >= 6 ? "tier-high" : p >= 2 ? "tier-mid" : "tier-low"; }
-
-// ── CSS ───────────────────────────────────────────────────────────────────────
-const css = `
-  @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Bebas+Neue&display=swap');
-  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-  :root{
-    --gold:#FFDC4E;--gold-dark:#c9a800;--gold-light:#ffe87a;
-    --navy:#020F2A;--navy-2:#102139;--navy-3:#1a2f4f;
-    --blue:#304FFE;--blue-dark:#044A80;--blue-glow:rgba(48,79,254,0.35);
-    --white:#F5F5F5;--card-bg:rgba(16,33,57,0.95);--glass:rgba(48,79,254,0.1);--muted:#8899AA;
-    --ease-out:cubic-bezier(0.23,1,0.32,1);
-    --ease-in-out:cubic-bezier(0.77,0,0.175,1);
-  }
-  body{font-family:'Cairo',sans-serif;background:var(--navy);color:var(--white);min-height:100vh;direction:rtl;overflow-x:hidden}
-  .pitch-bg{min-height:100vh;background:radial-gradient(ellipse 120% 60% at 50% -10%,rgba(48,79,254,0.25) 0%,transparent 60%),linear-gradient(180deg,#020F2A 0%,#0a1628 50%,#020F2A 100%)}
-  .hdr{background:linear-gradient(180deg,rgba(2,15,42,0.98),rgba(2,15,42,0.7));padding:22px 24px 16px;text-align:center;border-bottom:1px solid rgba(48,79,254,0.3);position:relative;overflow:hidden}
-  .hdr::before{content:'';position:absolute;top:-60px;left:50%;transform:translateX(-50%);width:400px;height:200px;background:radial-gradient(ellipse,rgba(48,79,254,0.2) 0%,transparent 70%);pointer-events:none}
-  .hdr-trophy{font-size:2.8rem;line-height:1;filter:drop-shadow(0 0 20px rgba(255,220,78,0.6))}
-  .hdr-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(1.8rem,6vw,3rem);letter-spacing:5px;color:var(--gold);text-shadow:0 0 40px rgba(255,220,78,0.5);margin:6px 0 3px}
-  .hdr-sub{font-size:0.82rem;color:var(--muted)}
-  .hdr-live{display:inline-flex;align-items:center;gap:6px;background:rgba(48,79,254,0.15);border:1px solid rgba(48,79,254,0.5);border-radius:20px;padding:4px 14px;font-size:0.73rem;color:#7b9cff;margin-top:8px;backdrop-filter:blur(4px)}
-  .live-dot{width:7px;height:7px;background:#4cff88;border-radius:50%;animation:pulse 1.4s infinite;box-shadow:0 0 8px #4cff88}
-  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
-  .nav{display:flex;justify-content:center;gap:6px;padding:14px 12px 0;flex-wrap:wrap}
-  .nav-btn{background:rgba(48,79,254,0.08);border:1px solid rgba(48,79,254,0.25);color:var(--muted);border-radius:10px;padding:7px 13px;font-family:'Cairo',sans-serif;font-size:0.8rem;font-weight:600;cursor:pointer;transition:transform 160ms var(--ease-out),background 160ms var(--ease-out),border-color 160ms var(--ease-out),color 160ms var(--ease-out),box-shadow 160ms var(--ease-out)}
-  @media(hover:hover) and (pointer:fine){.nav-btn:hover{border-color:rgba(48,79,254,0.6);color:var(--white);background:rgba(48,79,254,0.15)}}
-  .nav-btn:active{transform:scale(0.95)}
-  .nav-btn.active{background:linear-gradient(135deg,var(--gold),#d4a800);border-color:var(--gold);color:#020F2A;box-shadow:0 4px 20px rgba(255,220,78,0.4);font-weight:900}
-  .main{max-width:700px;margin:0 auto;padding:18px 14px 70px}
-  .card{background:var(--card-bg);border:1px solid rgba(48,79,254,0.2);border-radius:20px;padding:24px 20px;backdrop-filter:blur(16px);box-shadow:0 8px 40px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,0.04) inset;margin-bottom:16px}
-  .card-title{font-size:1.2rem;font-weight:900;color:var(--gold);text-align:center;margin-bottom:6px}
-  .card-sub{font-size:0.8rem;color:var(--muted);text-align:center;margin-bottom:20px}
-  .prize-box{background:linear-gradient(135deg,rgba(255,220,78,.12),rgba(48,79,254,0.06));border:1px solid rgba(255,220,78,.35);border-radius:12px;padding:12px 14px;margin-bottom:18px;text-align:center;font-size:0.84rem;color:var(--gold-light)}
-  .prize-box b{display:block;font-size:0.95rem;margin-bottom:4px}
-  .lbl{font-size:0.78rem;font-weight:700;color:var(--muted);margin-bottom:5px;letter-spacing:.4px}
-  .inp{width:100%;background:rgba(48,79,254,0.08);border:1px solid rgba(48,79,254,0.25);border-radius:10px;padding:11px 13px;color:var(--white);font-family:'Cairo',sans-serif;font-size:0.95rem;outline:none;transition:border-color 160ms var(--ease-out),box-shadow 160ms var(--ease-out);margin-bottom:14px;text-align:right}
-  .inp:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(48,79,254,0.2)}
-  .inp::placeholder{color:rgba(255,255,255,.25)}
-  .sel{width:100%;background:rgba(48,79,254,0.08);border:1px solid rgba(48,79,254,0.25);border-radius:10px;padding:11px 13px;color:var(--white);font-family:'Cairo',sans-serif;font-size:0.9rem;outline:none;margin-bottom:14px;cursor:pointer;transition:border-color 160ms var(--ease-out)}
-  .sel:focus{border-color:var(--blue)}
-  .sel option{background:#102139;color:var(--white)}
-  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .steps{display:flex;justify-content:center;gap:6px;margin-bottom:20px;align-items:center}
-  .step{display:flex;align-items:center;gap:5px;font-size:0.74rem;color:var(--muted)}
-  .step-num{width:22px;height:22px;border-radius:50%;border:1.5px solid rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:700;flex-shrink:0}
-  .step.active .step-num{background:var(--gold);border-color:var(--gold);color:#000}
-  .step.done .step-num{background:rgba(76,255,136,.2);border-color:#4cff88;color:#4cff88}
-  .step-line{width:18px;height:1px;background:rgba(255,255,255,.15)}
-  .team-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:7px;margin-bottom:16px;max-height:300px;overflow-y:auto;padding-left:4px}
-  .team-grid::-webkit-scrollbar{width:3px}
-  .team-grid::-webkit-scrollbar-thumb{background:var(--gold);border-radius:2px}
-  .t-tile{background:rgba(255,255,255,.05);border:1.5px solid rgba(255,255,255,.1);border-radius:11px;padding:9px 5px 7px;text-align:center;cursor:pointer;transition:transform 160ms var(--ease-out),border-color 160ms var(--ease-out),background 160ms var(--ease-out),box-shadow 160ms var(--ease-out);position:relative}
-  @media(hover:hover) and (pointer:fine){.t-tile:hover{border-color:rgba(212,175,55,.5);transform:translateY(-2px)}}
-  .t-tile:active{transform:scale(0.95)}
-  .t-tile.sel-t{border-color:var(--gold);background:rgba(255,220,78,.12);box-shadow:0 0 18px rgba(255,220,78,.25)}
-  .t-tile.sel-t::after{content:'✓';position:absolute;top:4px;left:6px;font-size:.65rem;color:var(--gold);font-weight:900}
-  .t-tile.full{opacity:.35;cursor:not-allowed}
-  .t-flag{font-size:1.5rem;display:block;margin-bottom:3px}
-  .t-name{font-size:0.68rem;font-weight:700;line-height:1.2}
-  .t-odds{font-size:0.62rem;color:var(--gold);margin-top:2px;font-weight:600}
-  .t-count{font-size:0.6rem;color:var(--muted)}
-  .tier-top{border-color:rgba(212,175,55,.32)!important}
-  .tier-high{border-color:rgba(100,180,255,.22)!important}
-  .tier-mid{border-color:rgba(100,255,150,.18)!important}
-  .tier-low{border-color:rgba(200,200,200,.12)!important}
-  .btn{width:100%;background:linear-gradient(135deg,var(--gold),#c9a800);border:none;border-radius:12px;padding:13px;font-family:'Cairo',sans-serif;font-size:1rem;font-weight:900;color:#020F2A;cursor:pointer;transition:transform 160ms var(--ease-out),box-shadow 160ms var(--ease-out),opacity 160ms var(--ease-out);box-shadow:0 4px 20px rgba(255,220,78,.3)}
-  @media(hover:hover) and (pointer:fine){.btn:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(255,220,78,.45)}}
-  .btn:active{transform:scale(0.97)}
-  .btn:disabled{opacity:.35;cursor:not-allowed;transform:none}
-  .btn-outline{background:transparent;border:1.5px solid var(--gold);color:var(--gold);box-shadow:none;margin-top:8px}
-  @media(hover:hover) and (pointer:fine){.btn-outline:hover{background:rgba(255,220,78,.1)}}
-  .btn-sm{padding:7px 13px;font-size:0.78rem;width:auto;border-radius:8px}
-  .btn-danger{background:rgba(255,60,60,.12);border:1px solid rgba(255,60,60,.3);color:#ff7777;box-shadow:none}
-  .btn-green{background:rgba(76,255,136,.12);border:1px solid rgba(76,255,136,.3);color:#4cff88;box-shadow:none}
-  .btn-whatsapp{background:linear-gradient(135deg,#25d366,#128c7e);border:none;color:#fff;box-shadow:0 4px 14px rgba(37,211,102,.35)}
-  .terms-wrap{max-height:56vh;overflow-y:auto;margin-bottom:18px;padding-left:4px}
-  .terms-wrap::-webkit-scrollbar{width:3px}
-  .terms-wrap::-webkit-scrollbar-thumb{background:var(--gold);border-radius:2px}
-  .terms-section{margin-bottom:20px}
-  .terms-section-title{display:flex;align-items:center;gap:8px;font-size:0.9rem;font-weight:900;color:var(--gold);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid rgba(255,220,78,.2)}
-  .terms-item{display:flex;gap:10px;margin-bottom:9px;font-size:0.82rem;line-height:1.7;color:rgba(244,244,240,.85)}
-  .terms-item-icon{flex-shrink:0;font-size:1rem;margin-top:1px}
-  .terms-accept-row{display:flex;align-items:flex-start;gap:10px;padding:12px;background:rgba(48,79,254,0.08);border:1px solid rgba(48,79,254,0.25);border-radius:10px;margin-bottom:14px;cursor:pointer;transition:background 160ms var(--ease-out),border-color 160ms var(--ease-out)}
-  .terms-accept-row:active{transform:scale(0.99)}
-  .terms-accept-row .cb{width:20px;height:20px;border:2px solid rgba(48,79,254,0.6);border-radius:5px;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all 160ms var(--ease-out);margin-top:2px}
-  .terms-accept-row.checked .cb{background:var(--gold);border-color:var(--gold)}
-  .terms-accept-row span{font-size:0.82rem;line-height:1.6;color:var(--white)}
-  .upd-bar{background:rgba(16,33,57,0.8);border:1px solid rgba(48,79,254,0.2);border-radius:10px;padding:9px 13px;display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;font-size:0.76rem;backdrop-filter:blur(8px)}
-  .upd-time{color:var(--muted)}
-  .upd-btn{background:rgba(48,79,254,0.15);border:1px solid rgba(48,79,254,0.4);border-radius:8px;color:#7b9cff;font-family:'Cairo',sans-serif;font-size:0.73rem;font-weight:700;padding:5px 11px;cursor:pointer;transition:transform 160ms var(--ease-out),background 160ms var(--ease-out)}
-  @media(hover:hover) and (pointer:fine){.upd-btn:hover{background:rgba(48,79,254,0.3);color:var(--white)}}
-  .upd-btn:active{transform:scale(0.95)}
-  .upd-btn:disabled{opacity:.4;cursor:not-allowed}
-  @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-  .spin{animation:spin 1s linear infinite;display:inline-block}
-  .p-card{background:var(--card-bg);border-radius:14px;padding:14px 16px;margin-bottom:10px;border:1px solid rgba(48,79,254,0.15);display:flex;align-items:center;gap:12px;position:relative;overflow:hidden;transition:transform 160ms var(--ease-out),box-shadow 160ms var(--ease-out);cursor:pointer;opacity:0;animation:cardIn 300ms var(--ease-out) forwards}
-  @media(hover:hover) and (pointer:fine){.p-card:hover{transform:translateY(-2px);box-shadow:0 6px 22px rgba(0,0,0,.4)}}
-  .p-card:active{transform:scale(0.98)}
-  @keyframes cardIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-  .p-card::before{content:'';position:absolute;right:0;top:0;bottom:0;width:4px;border-radius:0 14px 14px 0}
-  .r1::before{background:linear-gradient(180deg,#ffd700,#b8860b);box-shadow:-2px 0 12px rgba(255,215,0,.5)}
-  .r2::before{background:linear-gradient(180deg,#c0c0c0,#808080)}
-  .r3::before{background:linear-gradient(180deg,#cd7f32,#8b4513)}
-  .rn::before{background:rgba(255,255,255,.08)}
-  .r-badge{font-family:'Bebas Neue',sans-serif;font-size:1.4rem;min-width:28px;text-align:center;line-height:1}
-  .r1 .r-badge{color:#ffd700;text-shadow:0 0 10px rgba(255,215,0,.55)}
-  .r2 .r-badge{color:#c0c0c0}
-  .r3 .r-badge{color:#cd7f32}
-  .rn .r-badge{color:var(--muted)}
-  .p-flag{font-size:2.1rem;flex-shrink:0}
-  .p-info{flex:1;min-width:0}
-  .p-name{font-size:0.92rem;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .p-team{font-size:0.75rem;color:var(--muted);margin-top:1px}
-  .p-changed{font-size:0.65rem;color:#4cff88}
-  .p-prob{text-align:center;min-width:60px}
-  .p-val{font-family:'Bebas Neue',sans-serif;font-size:1.6rem;line-height:1}
-  .p-lbl{font-size:0.62rem;color:var(--muted)}
-  .p-bar-wrap{position:absolute;bottom:0;left:0;right:0;height:3px;background:rgba(255,255,255,.05);border-radius:0 0 14px 14px}
-  .p-bar{height:100%;border-radius:0 0 14px 14px;transition:width 1.2s ease}
-  .empty{text-align:center;padding:50px 20px;color:var(--muted)}
-  .empty .ei{font-size:3rem;margin-bottom:10px}
-  .loading-overlay{text-align:center;padding:60px 20px;color:var(--muted)}
-  .loading-overlay .spin-big{font-size:2.5rem;display:block;animation:spin 1s linear infinite;margin-bottom:12px}
-  .g-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:8px}
-  .g-card{background:var(--card-bg);border:1px solid rgba(48,79,254,0.15);border-radius:12px;padding:11px 9px;display:flex;flex-direction:column;align-items:center;gap:5px;transition:transform 160ms var(--ease-out),border-color 160ms var(--ease-out)}
-  @media(hover:hover) and (pointer:fine){.g-card:hover{transform:translateY(-2px);border-color:rgba(48,79,254,0.4)}}
-  .g-flag{font-size:1.7rem}
-  .g-name{font-size:0.74rem;font-weight:700;text-align:center}
-  .g-bar-wrap{width:100%;height:4px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden}
-  .g-bar-fill{height:100%;border-radius:2px}
-  .g-pct{font-size:0.7rem;color:var(--gold);font-weight:700}
-  .g-rank{font-size:0.62rem;color:var(--muted)}
-  .a-row{display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid rgba(48,79,254,0.1);font-size:0.8rem}
-  .modal-overlay{position:fixed;inset:0;background:rgba(2,15,42,0.85);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(12px);animation:overlayIn 150ms var(--ease-out)}
-  @keyframes overlayIn{from{opacity:0}to{opacity:1}}
-  .modal{background:var(--navy-2);border:1px solid rgba(48,79,254,0.3);border-radius:20px;padding:24px 20px;max-width:460px;width:100%;max-height:90vh;overflow-y:auto;position:relative;animation:modalIn 200ms var(--ease-out);box-shadow:0 24px 80px rgba(0,0,0,.8),0 0 0 1px rgba(255,255,255,0.05) inset}
-  @keyframes modalIn{from{opacity:0;transform:scale(0.95) translateY(4px)}to{opacity:1;transform:scale(1) translateY(0)}}
-  .p-card:nth-child(1){animation-delay:0ms}
-  .p-card:nth-child(2){animation-delay:50ms}
-  .p-card:nth-child(3){animation-delay:100ms}
-  .p-card:nth-child(4){animation-delay:150ms}
-  .p-card:nth-child(5){animation-delay:200ms}
-  .p-card:nth-child(6){animation-delay:250ms}
-  .p-card:nth-child(n+7){animation-delay:300ms}
-  @media(prefers-reduced-motion:reduce){
-    .p-card{animation:none;opacity:1}
-    .modal{animation:none}
-    .modal-overlay{animation:none}
-    *{transition-duration:0ms!important;animation-duration:0ms!important}
-  }
-  .modal::-webkit-scrollbar{width:3px}
-  .modal::-webkit-scrollbar-thumb{background:var(--gold);border-radius:2px}
-  .modal-close{position:absolute;top:14px;left:14px;background:rgba(255,255,255,.08);border:none;border-radius:8px;color:var(--white);font-size:1rem;width:30px;height:30px;cursor:pointer;display:flex;align-items:center;justify-content:center}
-  .jersey-preview{background:linear-gradient(135deg,rgba(212,175,55,.1),rgba(0,0,0,.3));border:1px solid rgba(212,175,55,.2);border-radius:14px;padding:16px;margin:14px 0;text-align:center}
-  .jersey-big{font-size:5rem;line-height:1}
-  .jersey-tag{display:inline-block;background:rgba(212,175,55,.15);border:1px solid var(--gold);border-radius:20px;padding:4px 14px;font-size:0.78rem;color:var(--gold);margin-top:6px}
-  .ai-preview{background:rgba(76,255,136,.06);border:1px solid rgba(76,255,136,.2);border-radius:12px;padding:14px;margin:12px 0;font-size:0.84rem;line-height:1.75;color:#c8ffd8}
-  .ai-loading{text-align:center;padding:16px;color:var(--muted);font-size:0.84rem}
-  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(calc(100% + 22px));background:linear-gradient(135deg,var(--navy-2),var(--navy-3));border:1px solid rgba(48,79,254,0.4);border-radius:14px;padding:12px 22px;color:var(--white);font-weight:700;font-size:0.87rem;text-align:center;z-index:999;transition:transform 400ms var(--ease-out),opacity 400ms var(--ease-out);min-width:240px;pointer-events:none;opacity:0;backdrop-filter:blur(12px);box-shadow:0 8px 32px rgba(0,0,0,.5),0 0 0 1px rgba(255,255,255,0.05) inset}
-  .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
-  .reg-closed-banner{background:rgba(255,60,60,.1);border:1px solid rgba(255,60,60,.35);border-radius:12px;padding:14px;text-align:center;margin-bottom:16px;color:#ff8888;font-size:0.86rem}
-  @media(max-width:480px){
-    .team-grid{grid-template-columns:repeat(auto-fill,minmax(82px,1fr))}
-    .g-grid{grid-template-columns:repeat(auto-fill,minmax(100px,1fr))}
-    .p-flag{font-size:1.7rem}
-    .p-val{font-size:1.35rem}
-    .nav-btn{padding:6px 9px;font-size:0.75rem}
-  }
-`;
-
-// ── Terms Content ─────────────────────────────────────────────────────────────
-const TERMS = [
-  { icon:"👕", title:"الجائزة", items:[
-    { icon:"🏆", text:"الجائزة هي تيشرت المنتخب الفائز بكأس العالم 2026 (أصلي)." },
-    { icon:"💰", text:"تُموَّل الجائزة بالتساوي من جميع المشاركين الخاسرين — يُقسَّم سعر التيشرت على عدد الخاسرين ويدفع كل منهم حصته." },
-    { icon:"🎽", text:"في حال الفوز، يحق للفائز اختيار الاسم والرقم ولون الطقم والمقاس المطبوعَين على التيشرت." },
-    { icon:"🤝", text:"إذا فاز أكثر من شخص بنفس المنتخب، تُقسَّم تكلفة التيشرتات على جميع الخاسرين." },
-  ]},
-  { icon:"🗳️", title:"التسجيل والتصويت", items:[
-    { icon:"📋", text:"يجب التسجيل قبل انطلاق البطولة (11 يونيو 2026). لا يُقبَل التسجيل بعد انطلاق المباراة الأولى." },
-    { icon:"🔄", text:"يُسمح بتغيير اختيار المنتخب مرة واحدة فقط، خلال 24 ساعة بعد انتهاء دور المجموعات. بعدها يصبح التصويت نهائياً." },
-    { icon:"⚠️", text:"لا يمكن اختيار نفس المنتخب لأكثر من 3 أشخاص مختلفين. بعد اكتمال الحد، يُغلَق المنتخب." },
-    { icon:"🚫", text:"لا يُسمح بالتسجيل بأكثر من اسم واحد. أي تلاعب يؤدي إلى الإلغاء الفوري." },
-  ]},
-  { icon:"🎽", title:"بيانات التيشرت", items:[
-    { icon:"✍️", text:"يجب على كل مشارك إدخال الاسم والرقم المراد طباعتهما على التيشرت عند التسجيل." },
-    { icon:"🎨", text:"يجب اختيار لون الطقم (أول / ثاني / ثالث) والمقاس من القائمة المتاحة." },
-    { icon:"📸", text:"يمكن إضافة صورة شخصية اختيارية لمعرفة شكل التيشرت — الصورة للمعاينة فقط ولا تُشارَك." },
-    { icon:"📦", text:"بيانات التيشرت مُلزِمة عند الفوز. لا يمكن تعديلها بعد انتهاء دور المجموعات." },
-  ]},
-  { icon:"⚖️", title:"أحكام عامة", items:[
-    { icon:"📊", text:"الترتيب يعكس احتمالات أسواق الرهان العالمية ويتغير بعد كل جولة من المباريات." },
-    { icon:"☁️", text:"البيانات تُحفَظ على السحابة ومشتركة بين جميع المشاركين في الوقت الفعلي." },
-    { icon:"📱", text:"المسابقة للاستخدام الشخصي بين الأصدقاء والعائلة فقط." },
-    { icon:"✅", text:"بالمشاركة، يُقِرّ المشارك بقراءة هذه الشروط والموافقة عليها كاملةً." },
-  ]},
-];
-
-// ── App ───────────────────────────────────────────────────────────────────────
-export default function App() {
-  const [tab, setTab] = useState("leaderboard");
-  const [participants, setParticipants] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [toast, setToast] = useState({ show: false, msg: "" });
-  const [odds, setOdds] = useState(() => { const o = {}; TEAMS.forEach(t => { o[t.id] = t.odds; }); return o; });
-  const [loadingOdds, setLoadingOdds] = useState(false);
-  const [lastUpdate, setLastUpdate] = useState(null);
-  const [adminInput, setAdminInput] = useState("");
-  const [adminUnlocked, setAdminUnlocked] = useState(false);
-  const [searchTeam, setSearchTeam] = useState("");
-  const [modalP, setModalP] = useState(null);
-  const [aiPreview, setAiPreview] = useState("");
-  const [aiLoading, setAiLoading] = useState(false);
-  const [termsAccepted, setTermsAccepted] = useState(false);
-  const [regStep, setRegStep] = useState(1);
-  const [regName, setRegName] = useState("");
-  const [regTeam, setRegTeam] = useState(null);
-  const [regJerseyName, setRegJerseyName] = useState("");
-  const [regJerseyNum, setRegJerseyNum] = useState("");
-  const [regJerseyColor, setRegJerseyColor] = useState("home");
-  const [regJerseySize, setRegJerseySize] = useState("L");
-  const [regPhoto, setRegPhoto] = useState(null);
-  const [voteChangeTarget, setVoteChangeTarget] = useState(null);
-  const [voteChangeTeam, setVoteChangeTeam] = useState(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  // ── NEW state ──
-  const [regOpen, setRegOpen] = useState(() => localStorage.getItem("regOpen") !== "false");
-  const [winnerTeamId, setWinnerTeamId] = useState(() => localStorage.getItem("winnerTeamId") || null);
-  const [showWinnerPage, setShowWinnerPage] = useState(() => !!localStorage.getItem("winnerTeamId"));
-  const [rtConnected, setRtConnected] = useState(false);
-  const prevParticipantIds = useRef(new Set());
-
-  // ── NEW: Matches state ──
-  const [matchesData, setMatchesData] = useState(null);
-  const [matchesLoading, setMatchesLoading] = useState(false);
-  const [matchesLastUpdate, setMatchesLastUpdate] = useState(null);
-  const [matchesFetching, setMatchesFetching] = useState(false);
-
-  const fileRef = useRef();
-
-  // ── Request notification permission ──
-  useEffect(() => { requestNotifPermission(); }, []);
-
-  // ── NEW: Auto-fetch matches ──
-  const doFetchMatches = useCallback(async () => {
-    setMatchesFetching(true);
-    const data = await fetchMatchData();
-    setMatchesFetching(false);
-    if (data) {
-      setMatchesData(data);
-      setMatchesLastUpdate(new Date().toLocaleTimeString("ar-SA"));
     }
-    setMatchesLoading(false);
-  }, []);
 
-  useEffect(() => {
-    setMatchesLoading(true);
-    doFetchMatches();
-  }, [doFetchMatches]);
+    return Object.keys(results).length > 0 ? results : null;
+  } catch { return null; }
+}
 
-  // تحديث ذكي: كل دقيقة إذا في مباراة مباشرة، وإلا كل 5 دقائق
-  useEffect(() => {
-    const hasLive = matchesData?.today?.some(m => m.status === "live");
-    const interval = setInterval(doFetchMatches, hasLive ? 60 * 1000 : 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [matchesData, doFetchMatches]);
+// ── بيانات المجموعات الرسمية ──────────────────────────
+const GROUPS_DATA = {
+  A: { teams: [
+    { id:"mexico",      name:"المكسيك",         flag:"🇲🇽", host:true  },
+    { id:"southafrica", name:"جنوب إفريقيا",     flag:"🇿🇦" },
+    { id:"southkorea",  name:"كوريا الجنوبية",   flag:"🇰🇷" },
+    { id:"czech",       name:"التشيك",           flag:"🇨🇿" },
+  ]},
+  B: { teams: [
+    { id:"canada",      name:"كندا",             flag:"🇨🇦", host:true  },
+    { id:"bosnia",      name:"البوسنة والهرسك",  flag:"🇧🇦" },
+    { id:"qatar",       name:"قطر",              flag:"🇶🇦" },
+    { id:"switzerland", name:"سويسرا",           flag:"🇨🇭" },
+  ]},
+  C: { teams: [
+    { id:"brazil",      name:"البرازيل",         flag:"🇧🇷" },
+    { id:"morocco",     name:"المغرب",           flag:"🇲🇦" },
+    { id:"haiti",       name:"هايتي",            flag:"🇭🇹" },
+    { id:"scotland",    name:"اسكتلندا",         flag:"🏴󠁧󠁢󠁳󠁣󠁴󠁿" },
+  ]},
+  D: { teams: [
+    { id:"usa",         name:"الولايات المتحدة", flag:"🇺🇸", host:true  },
+    { id:"paraguay",    name:"باراغواي",         flag:"🇵🇾" },
+    { id:"australia",   name:"أستراليا",         flag:"🇦🇺" },
+    { id:"turkey",      name:"تركيا",            flag:"🇹🇷" },
+  ]},
+  E: { teams: [
+    { id:"germany",     name:"ألمانيا",          flag:"🇩🇪" },
+    { id:"curacao",     name:"كوراساو",          flag:"🇨🇼" },
+    { id:"ivorycoast",  name:"ساحل العاج",       flag:"🇨🇮" },
+    { id:"ecuador",     name:"الإكوادور",        flag:"🇪🇨" },
+  ]},
+  F: { teams: [
+    { id:"netherlands", name:"هولندا",           flag:"🇳🇱" },
+    { id:"japan",       name:"اليابان",          flag:"🇯🇵" },
+    { id:"sweden",      name:"السويد",           flag:"🇸🇪" },
+    { id:"tunisia",     name:"تونس",             flag:"🇹🇳" },
+  ]},
+  G: { teams: [
+    { id:"belgium",     name:"بلجيكا",           flag:"🇧🇪" },
+    { id:"egypt",       name:"مصر",              flag:"🇪🇬" },
+    { id:"iran",        name:"إيران",            flag:"🇮🇷" },
+    { id:"newzealand",  name:"نيوزيلندا",        flag:"🇳🇿" },
+  ]},
+  H: { teams: [
+    { id:"spain",       name:"إسبانيا",          flag:"🇪🇸" },
+    { id:"capeverde",   name:"الرأس الأخضر",     flag:"🇨🇻" },
+    { id:"saudiarabia", name:"السعودية",         flag:"🇸🇦" },
+    { id:"uruguay",     name:"أوروغواي",         flag:"🇺🇾" },
+  ]},
+  I: { teams: [
+    { id:"france",      name:"فرنسا",            flag:"🇫🇷" },
+    { id:"senegal",     name:"السنغال",          flag:"🇸🇳" },
+    { id:"iraq",        name:"العراق",           flag:"🇮🇶" },
+    { id:"norway",      name:"النرويج",          flag:"🇳🇴" },
+  ]},
+  J: { teams: [
+    { id:"argentina",   name:"الأرجنتين",        flag:"🇦🇷" },
+    { id:"algeria",     name:"الجزائر",          flag:"🇩🇿" },
+    { id:"austria",     name:"النمسا",           flag:"🇦🇹" },
+    { id:"jordan",      name:"الأردن",           flag:"🇯🇴" },
+  ]},
+  K: { teams: [
+    { id:"portugal",    name:"البرتغال",         flag:"🇵🇹" },
+    { id:"drcongo",     name:"ج. الكونغو",       flag:"🇨🇩" },
+    { id:"uzbekistan",  name:"أوزبكستان",        flag:"🇺🇿" },
+    { id:"colombia",    name:"كولومبيا",         flag:"🇨🇴" },
+  ]},
+  L: { teams: [
+    { id:"england",     name:"إنجلترا",          flag:"🏴󠁧󠁢󠁥󠁮󠁧󠁿" },
+    { id:"croatia",     name:"كرواتيا",          flag:"🇭🇷" },
+    { id:"ghana",       name:"غانا",             flag:"🇬🇭" },
+    { id:"panama",      name:"بنما",             flag:"🇵🇦" },
+  ]},
+};
 
-  // ── Initial load ──
-  const loadParticipants = useCallback(async () => {
-    try {
-      const data = await sb.select();
-      if (Array.isArray(data)) {
-        setParticipants(data);
-        prevParticipantIds.current = new Set(data.map(p => p.id));
-      }
-    } catch {}
-    setLoading(false);
-  }, []);
+// ── جدول المباريات بتوقيت السعودية (UTC+3) ─────────────
+const MATCH_SCHEDULE = {
+  "A_mexico_southafrica":    { date:"الخميس 11 يونيو",  time:"10:00 م" },
+  "A_southkorea_czech":      { date:"الجمعة 12 يونيو",  time:"05:00 ص" },
+  "A_czech_southafrica":     { date:"الخميس 18 يونيو",  time:"07:00 م" },
+  "A_mexico_southkorea":     { date:"الجمعة 19 يونيو",  time:"04:00 ص" },
+  "A_czech_mexico":          { date:"الأربعاء 25 يونيو", time:"04:00 ص" },
+  "A_southafrica_southkorea":{ date:"الأربعاء 25 يونيو", time:"04:00 ص" },
+  "B_canada_bosnia":         { date:"الجمعة 12 يونيو",  time:"10:00 م" },
+  "B_qatar_switzerland":     { date:"السبت 13 يونيو",   time:"10:00 م" },
+  "B_switzerland_bosnia":    { date:"الخميس 18 يونيو",  time:"10:00 م" },
+  "B_canada_qatar":          { date:"الجمعة 19 يونيو",  time:"01:00 ص" },
+  "B_switzerland_canada":    { date:"الأربعاء 25 يونيو", time:"10:00 م" },
+  "B_bosnia_qatar":          { date:"الأربعاء 25 يونيو", time:"10:00 م" },
+  "C_brazil_morocco":        { date:"السبت 13 يونيو",   time:"01:00 ص" },
+  "C_haiti_scotland":        { date:"السبت 13 يونيو",   time:"04:00 ص" },
+  "C_scotland_morocco":      { date:"الجمعة 20 يونيو",  time:"01:00 ص" },
+  "C_brazil_haiti":          { date:"الجمعة 20 يونيو",  time:"03:30 ص" },
+  "C_scotland_brazil":       { date:"الأربعاء 25 يونيو", time:"01:00 ص" },
+  "C_morocco_haiti":         { date:"الأربعاء 25 يونيو", time:"01:00 ص" },
+  "D_usa_paraguay":          { date:"السبت 13 يونيو",   time:"04:00 ص" },
+  "D_australia_turkey":      { date:"الأحد 14 يونيو",   time:"07:00 م" },
+  "D_usa_australia":         { date:"الجمعة 20 يونيو",  time:"10:00 م" },
+  "D_turkey_paraguay":       { date:"السبت 21 يونيو",   time:"06:00 ص" },
+  "D_turkey_usa":            { date:"الخميس 26 يونيو",  time:"05:00 ص" },
+  "D_paraguay_australia":    { date:"الخميس 26 يونيو",  time:"05:00 ص" },
+  "E_germany_curacao":       { date:"الأحد 14 يونيو",   time:"08:00 م" },
+  "E_ivorycoast_ecuador":    { date:"الاثنين 15 يونيو", time:"02:00 ص" },
+  "E_germany_ivorycoast":    { date:"السبت 21 يونيو",   time:"11:00 م" },
+  "E_ecuador_curacao":       { date:"الأحد 22 يونيو",   time:"03:00 ص" },
+  "E_curacao_ivorycoast":    { date:"الخميس 26 يونيو",  time:"11:00 م" },
+  "E_ecuador_germany":       { date:"الخميس 26 يونيو",  time:"11:00 م" },
+  "F_netherlands_japan":     { date:"الأحد 14 يونيو",   time:"11:00 م" },
+  "F_sweden_tunisia":        { date:"الاثنين 15 يونيو", time:"05:00 ص" },
+  "F_netherlands_sweden":    { date:"السبت 21 يونيو",   time:"08:00 م" },
+  "F_tunisia_japan":         { date:"الأحد 22 يونيو",   time:"07:00 ص" },
+  "F_japan_sweden":          { date:"الجمعة 26 يونيو",  time:"02:00 ص" },
+  "F_tunisia_netherlands":   { date:"الجمعة 26 يونيو",  time:"02:00 ص" },
+  "G_belgium_egypt":         { date:"الاثنين 16 يونيو", time:"10:00 م" },
+  "G_iran_newzealand":       { date:"الثلاثاء 17 يونيو",time:"04:00 ص" },
+  "G_belgium_iran":          { date:"الاثنين 23 يونيو", time:"10:00 م" },
+  "G_newzealand_egypt":      { date:"الثلاثاء 24 يونيو",time:"04:00 ص" },
+  "G_egypt_iran":            { date:"الجمعة 27 يونيو",  time:"06:00 ص" },
+  "G_newzealand_belgium":    { date:"الجمعة 27 يونيو",  time:"06:00 ص" },
+  "H_spain_capeverde":       { date:"الاثنين 16 يونيو", time:"07:00 م" },
+  "H_saudiarabia_uruguay":   { date:"الثلاثاء 17 يونيو",time:"01:00 ص" },
+  "H_spain_saudiarabia":     { date:"الأحد 22 يونيو",   time:"07:00 م" },
+  "H_uruguay_capeverde":     { date:"الاثنين 23 يونيو", time:"01:00 ص" },
+  "H_capeverde_saudiarabia": { date:"الجمعة 27 يونيو",  time:"03:00 ص" },
+  "H_uruguay_spain":         { date:"الجمعة 27 يونيو",  time:"03:00 ص" },
+  "I_france_senegal":        { date:"الثلاثاء 17 يونيو",time:"10:00 م" },
+  "I_iraq_norway":           { date:"الأربعاء 18 يونيو",time:"01:00 ص" },
+  "I_france_iraq":           { date:"الاثنين 23 يونيو", time:"12:00 ص" },
+  "I_norway_senegal":        { date:"الثلاثاء 24 يونيو",time:"03:00 ص" },
+  "I_norway_france":         { date:"الجمعة 27 يونيو",  time:"10:00 م" },
+  "I_senegal_iraq":          { date:"الجمعة 27 يونيو",  time:"10:00 م" },
+  "J_argentina_algeria":     { date:"الأربعاء 18 يونيو",time:"04:00 ص" },
+  "J_austria_jordan":        { date:"الأربعاء 18 يونيو",time:"07:00 ص" },
+  "J_argentina_austria":     { date:"الاثنين 23 يونيو", time:"08:00 م" },
+  "J_jordan_algeria":        { date:"الثلاثاء 24 يونيو",time:"06:00 ص" },
+  "J_algeria_austria":       { date:"السبت 28 يونيو",   time:"05:00 ص" },
+  "J_jordan_argentina":      { date:"السبت 28 يونيو",   time:"05:00 ص" },
+  "K_portugal_drcongo":      { date:"الأربعاء 18 يونيو",time:"08:00 م" },
+  "K_uzbekistan_colombia":   { date:"الخميس 19 يونيو",  time:"05:00 ص" },
+  "K_portugal_uzbekistan":   { date:"الثلاثاء 24 يونيو",time:"08:00 م" },
+  "K_colombia_drcongo":      { date:"الأربعاء 25 يونيو",time:"05:00 ص" },
+  "K_colombia_portugal":     { date:"السبت 28 يونيو",   time:"02:30 ص" },
+  "K_drcongo_uzbekistan":    { date:"السبت 28 يونيو",   time:"02:30 ص" },
+  "L_england_croatia":       { date:"الأربعاء 18 يونيو",time:"11:00 م" },
+  "L_ghana_panama":          { date:"الخميس 19 يونيو",  time:"02:00 ص" },
+  "L_england_ghana":         { date:"الثلاثاء 24 يونيو",time:"11:00 م" },
+  "L_panama_croatia":        { date:"الأربعاء 25 يونيو",time:"02:00 ص" },
+  "L_panama_england":        { date:"السبت 28 يونيو",   time:"12:00 ص" },
+  "L_croatia_ghana":         { date:"السبت 28 يونيو",   time:"12:00 ص" },
+};
 
-  useEffect(() => { loadParticipants(); }, [loadParticipants]);
+// توليد قائمة المباريات لكل مجموعة
+function getGroupMatches(groupLetter) {
+  const teams = GROUPS_DATA[groupLetter].teams;
+  const matches = [];
+  for (let i = 0; i < teams.length; i++) {
+    for (let j = i + 1; j < teams.length; j++) {
+      matches.push({ home: teams[i], away: teams[j] });
+    }
+  }
+  return matches;
+}
 
-  // ── NEW: Supabase Realtime (replaces polling) ──
-  useSupabaseRealtime((event) => {
-    if (event.type === "INSERT" && event.record) {
-      setParticipants(prev => {
-        if (prev.find(p => p.id === event.record.id)) return prev;
-        sendNotif("مشارك جديد! 🎉", `${event.record.name} اختار ${event.record.team_flag} ${event.record.team_name}`);
-        return [...prev, event.record];
-      });
-      setRtConnected(true);
-    } else if (event.type === "UPDATE" && event.record) {
-      setParticipants(prev => prev.map(p => p.id === event.record.id ? event.record : p));
-      setRtConnected(true);
-    } else if (event.type === "DELETE" && event.old_record) {
-      setParticipants(prev => prev.filter(p => p.id !== event.old_record.id));
+// حساب الترتيب من نتائج المباريات
+function calcStandings(teams, results) {
+  const stats = {};
+  teams.forEach(t => {
+    stats[t.id] = { ...t, p:0, w:0, d:0, l:0, gf:0, ga:0, pts:0 };
+  });
+  results.forEach(r => {
+    if (r.played) {
+      const h = stats[r.homeId], a = stats[r.awayId];
+      h.p++; a.p++;
+      h.gf += r.homeScore; h.ga += r.awayScore;
+      a.gf += r.awayScore; a.ga += r.homeScore;
+      if (r.homeScore > r.awayScore) { h.w++; h.pts += 3; a.l++; }
+      else if (r.homeScore < r.awayScore) { a.w++; a.pts += 3; h.l++; }
+      else { h.d++; a.d++; h.pts++; a.pts++; }
     }
   });
+  return Object.values(stats).sort((a,b) => {
+    if (b.pts !== a.pts) return b.pts - a.pts;
+    const gdA = a.gf - a.ga, gdB = b.gf - b.ga;
+    if (gdB !== gdA) return gdB - gdA;
+    return b.gf - a.gf;
+  });
+}
 
-  const showToast = (msg, dur = 3200) => {
-    setToast({ show: true, msg });
-    setTimeout(() => setToast({ show: false, msg: "" }), dur);
+// ── الكومبوننت الرئيسي ────────────────────────────────
+export default function BracketTab({ participants = [], adminUnlocked = false }) {
+  const [subTab, setSubTab] = useState("groups");
+  const [matchData, setMatchData] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("wc2026_matches") || "{}"); } catch { return {}; }
+  });
+  const [knockoutData, setKnockoutData] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("wc2026_knockout") || "{}"); } catch { return {}; }
+  });
+  const [editingMatch, setEditingMatch] = useState(null);
+  const [editScore, setEditScore] = useState({ home: "", away: "" });
+  const [editingKO, setEditingKO] = useState(null);
+  const [fetchingResults, setFetchingResults] = useState(false);
+  const [lastFetch, setLastFetch] = useState(null);
+  const [fetchStatus, setFetchStatus] = useState("");
+
+  // فرق المشاركين
+  const compTeamIds = new Set(participants.map(p => p.team_id));
+
+  // جلب النتائج التلقائي
+  const handleFetchResults = async () => {
+    setFetchingResults(true);
+    setFetchStatus("🔍 يبحث عن النتائج...");
+    const results = await fetchLiveMatchResults();
+    setFetchingResults(false);
+    if (results && Object.keys(results).length > 0) {
+      const newData = { ...matchData, ...results };
+      setMatchData(newData);
+      localStorage.setItem("wc2026_matches", JSON.stringify(newData));
+      setLastFetch(new Date().toLocaleTimeString("ar-SA"));
+      setFetchStatus(`✅ تم تحديث ${Object.keys(results).length} مباراة`);
+    } else {
+      setFetchStatus("⚠️ لم تُعثر على نتائج جديدة");
+    }
+    setTimeout(() => setFetchStatus(""), 4000);
   };
 
-  const teamCount = (tid) => participants.filter(p => p.team_id === tid).length;
+  // ── جلب فوري عند تحميل الصفحة + تحديث كل دقيقة ──
+  useEffect(() => {
+    handleFetchResults(); // فوراً عند الفتح
+    const interval = setInterval(handleFetchResults, 60 * 1000);
+    return () => clearInterval(interval);
+  }, []); // [] = مرة واحدة عند mount
 
-  // ── Register ──
-  const isRegClosed = !regOpen || REGISTRATION_DEADLINE <= new Date();
-
-  const handleRegister = async () => {
-    if (submitting) return;
-    if (isRegClosed) return showToast("🔒 التسجيل مغلق حالياً");
-    if (!regName.trim()) return showToast("⚠️ اكتب اسمك");
-    if (!regTeam) return showToast("⚠️ اختر منتخبك");
-    if (!regJerseyName.trim()) return showToast("⚠️ أدخل الاسم للطباعة على التيشرت");
-    if (!regJerseyNum.trim()) return showToast("⚠️ أدخل الرقم للطباعة على التيشرت");
-    const duplicate = participants.find(p => p.name.trim().toLowerCase() === regName.trim().toLowerCase());
-    if (duplicate) return showToast("⚠️ هذا الاسم مسجل مسبقاً");
-    if (teamCount(regTeam) >= MAX_PER_TEAM) return showToast(`⚠️ هذا المنتخب وصل الحد الأقصى (${MAX_PER_TEAM} أشخاص)`);
-    setSubmitting(true);
-    const team = TEAMS.find(t => t.id === regTeam);
-    const row = { name: regName.trim(), team_id: regTeam, team_name: team.name, team_flag: team.flag, jersey: { name: regJerseyName.trim(), number: regJerseyNum.trim(), color: regJerseyColor, size: regJerseySize }, photo: regPhoto, vote_changed: false, can_change_vote: true };
-    try {
-      const latest = await sb.select();
-      if (Array.isArray(latest)) {
-        const serverDup = latest.find(p => p.name.trim().toLowerCase() === regName.trim().toLowerCase());
-        if (serverDup) { setSubmitting(false); return showToast("⚠️ هذا الاسم مسجل مسبقاً"); }
-        setParticipants(latest);
-      }
-      const res = await sb.insert(row);
-      if (Array.isArray(res) && res[0]) {
-        setParticipants(prev => [...prev, res[0]]);
-        showToast(`🎉 تم تسجيل ${regName.trim()} — ${team.flag} ${team.name}`);
-        setRegName(""); setRegTeam(null); setRegStep(1);
-        setRegJerseyName(""); setRegJerseyNum(""); setRegJerseyColor("home"); setRegJerseySize("L"); setRegPhoto(null);
-        setTimeout(() => setTab("leaderboard"), 1200);
-      } else {
-        showToast("❌ فشل التسجيل — حاول مجدداً");
-      }
-    } catch { showToast("❌ خطأ في الاتصال"); }
-    finally { setSubmitting(false); }
+  const saveMatch = () => {
+    const h = parseInt(editScore.home), a = parseInt(editScore.away);
+    if (isNaN(h) || isNaN(a) || h < 0 || a < 0) return;
+    const key = editingMatch;
+    const newData = { ...matchData, [key]: { homeScore: h, awayScore: a, played: true } };
+    setMatchData(newData);
+    localStorage.setItem("wc2026_matches", JSON.stringify(newData));
+    setEditingMatch(null);
   };
 
-  const handleUpdateOdds = useCallback(async () => {
-    setLoadingOdds(true);
-    const fresh = await fetchLiveOdds();
-    setLoadingOdds(false);
-    if (fresh) {
-      setOdds(prev => ({ ...prev, ...fresh }));
-      setLastUpdate(new Date().toLocaleTimeString("ar-SA"));
-      showToast("✅ تم تحديث الاحتمالات");
-    } else { showToast("⚠️ تعذّر التحديث — آخر بيانات محفوظة"); }
-  }, []);
-
-  const openModal = async (p) => {
-    setModalP(p); setAiPreview(""); setAiLoading(true);
-    const colorLbl = JERSEY_KIT_TYPES.find(c => c.id === p.jersey?.color)?.label || p.jersey?.color;
-    const text = await generateJerseyPreview(p.jersey?.name, p.jersey?.number, p.team_name, p.team_flag, colorLbl, p.jersey?.size);
-    setAiPreview(text || ""); setAiLoading(false);
+  const clearMatch = (key) => {
+    const newData = { ...matchData };
+    delete newData[key];
+    setMatchData(newData);
+    localStorage.setItem("wc2026_matches", JSON.stringify(newData));
   };
 
-  const handleVoteChange = async () => {
-    if (!voteChangeTeam) return showToast("⚠️ اختر المنتخب الجديد");
-    if (teamCount(voteChangeTeam) >= MAX_PER_TEAM) return showToast(`⚠️ هذا المنتخب وصل الحد الأقصى`);
-    const team = TEAMS.find(t => t.id === voteChangeTeam);
-    try {
-      await sb.update(voteChangeTarget, { team_id: voteChangeTeam, team_name: team.name, team_flag: team.flag, vote_changed: true, can_change_vote: false });
-      await loadParticipants();
-      showToast(`✅ تم تغيير التصويت إلى ${team.flag} ${team.name}`);
-      setVoteChangeTarget(null); setVoteChangeTeam(null);
-    } catch { showToast("❌ فشل التغيير"); }
+  const saveKO = (key, winner) => {
+    const newData = { ...knockoutData, [key]: winner };
+    setKnockoutData(newData);
+    localStorage.setItem("wc2026_knockout", JSON.stringify(newData));
+    setEditingKO(null);
   };
 
-  // ── NEW: Admin toggle reg ──
-  const toggleReg = () => {
-    const next = !regOpen;
-    setRegOpen(next);
-    localStorage.setItem("regOpen", next ? "true" : "false");
-    showToast(next ? "✅ التسجيل مفتوح الآن" : "🔒 تم إغلاق التسجيل");
+  const clearKO = (key) => {
+    const newData = { ...knockoutData };
+    delete newData[key];
+    setKnockoutData(newData);
+    localStorage.setItem("wc2026_knockout", JSON.stringify(newData));
   };
 
-  // ── NEW: Declare winner ──
-  const declareWinner = (teamId) => {
-    setWinnerTeamId(teamId);
-    setShowWinnerPage(true);
-    localStorage.setItem("winnerTeamId", teamId);
-  };
+  // أفضل الثالثين
+  const allThirds = useMemo(() => {
+    return Object.keys(GROUPS_DATA).map(g => {
+      const gmatches = getGroupMatches(g).map((m,i) => {
+        const key = `${g}_${m.home.id}_${m.away.id}`;
+        const r = matchData[key];
+        return r ? { homeId: m.home.id, awayId: m.away.id, ...r } : null;
+      }).filter(Boolean);
+      const s = calcStandings(GROUPS_DATA[g].teams, gmatches);
+      return s[2] ? { ...s[2], group: g } : null;
+    }).filter(Boolean).sort((a,b) => {
+      if (b.pts !== a.pts) return b.pts - a.pts;
+      return (b.gf-b.ga) - (a.gf-a.ga);
+    });
+  }, [matchData]);
 
-  const leaderboard = [...participants].sort((a, b) => (odds[b.team_id] || 0) - (odds[a.team_id] || 0));
-  const topProb = Math.max(...leaderboard.map(p => odds[p.team_id] || 0), 1);
-  const filteredTeams = TEAMS.filter(t => t.name.includes(searchTeam) || t.en.toLowerCase().includes(searchTeam.toLowerCase()));
-  const guideSorted = [...TEAMS].sort((a, b) => (odds[b.id] || b.odds) - (odds[a.id] || a.odds));
-  const maxGuideP = odds[guideSorted[0]?.id] || guideSorted[0]?.odds || 1;
-  const colorLabel = (id) => JERSEY_KIT_TYPES.find(c => c.id === id)?.label || id;
+  const css = `
+    .br-nav{display:flex;gap:8px;margin-bottom:16px;justify-content:center}
+    .br-nav-btn{background:rgba(255,255,255,0.06);border:1px solid rgba(212,175,55,0.3);color:#a0b8a8;border-radius:10px;padding:8px 18px;font-family:'Cairo',sans-serif;font-size:0.82rem;font-weight:700;cursor:pointer;transition:all .2s}
+    .br-nav-btn.active{background:linear-gradient(135deg,#d4af37,#b8962e);border-color:#d4af37;color:#000}
+    .group-card{background:rgba(4,30,16,0.92);border:1px solid rgba(212,175,55,0.2);border-radius:14px;padding:14px;margin-bottom:12px}
+    .group-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+    .group-lbl{font-family:'Bebas Neue',sans-serif;font-size:1.2rem;color:#d4af37;letter-spacing:2px}
+    .group-table{width:100%;border-collapse:collapse;font-size:0.78rem}
+    .group-table th{color:#a0b8a8;font-weight:700;text-align:center;padding:3px 4px;border-bottom:1px solid rgba(255,255,255,0.08)}
+    .group-table td{padding:5px 4px;text-align:center;border-bottom:1px solid rgba(255,255,255,0.04)}
+    .group-table tr.qualify-1 td:first-child{border-right:3px solid #4cff88}
+    .group-table tr.qualify-2 td:first-child{border-right:3px solid #44ddff}
+    .group-table tr.qualify-3 td:first-child{border-right:3px solid rgba(255,200,60,0.5)}
+    .team-cell{display:flex;align-items:center;gap:6px;text-align:right;min-width:90px}
+    .team-flag-sm{font-size:1rem}
+    .team-name-sm{font-size:0.74rem;font-weight:700;white-space:nowrap}
+    .comp-badge{font-size:0.55rem;background:rgba(212,175,55,0.2);border:1px solid rgba(212,175,55,0.4);border-radius:4px;padding:1px 4px;color:#d4af37;margin-right:3px}
+    .match-list{margin-top:10px;border-top:1px solid rgba(255,255,255,0.06);padding-top:8px}
+    .match-row{display:flex;align-items:center;gap:6px;padding:4px 0;font-size:0.74rem;cursor:pointer;border-radius:6px;padding:4px 6px;transition:background .15s}
+    .match-row:hover{background:rgba(255,255,255,0.05)}
+    .match-team{flex:1;font-weight:600}
+    .match-team.home{text-align:right}
+    .match-team.away{text-align:left}
+    .match-score{min-width:44px;text-align:center;font-family:'Bebas Neue',sans-serif;font-size:0.95rem;color:#d4af37}
+    .match-score.played{color:#4cff88}
+    .match-score.tbd{color:#a0b8a8;font-size:0.7rem}
+    .ko-section{margin-bottom:20px}
+    .ko-title{font-family:'Bebas Neue',sans-serif;font-size:1.1rem;color:#d4af37;letter-spacing:2px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid rgba(212,175,55,0.2)}
+    .ko-match{background:rgba(4,30,16,0.92);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;gap:8px;cursor:pointer;transition:all .18s}
+    .ko-match:hover{border-color:rgba(212,175,55,0.4)}
+    .ko-team{flex:1;font-size:0.82rem;font-weight:700}
+    .ko-team.home{text-align:right}
+    .ko-team.away{text-align:left}
+    .ko-vs{font-size:0.7rem;color:#a0b8a8;min-width:20px;text-align:center}
+    .ko-won{color:#4cff88!important}
+    .modal-sm{background:#0a2d18;border:1px solid rgba(212,175,55,0.3);border-radius:16px;padding:20px;max-width:340px;width:100%}
+    .score-inp{width:52px;background:rgba(255,255,255,0.08);border:1px solid rgba(212,175,55,0.3);border-radius:8px;padding:8px;color:#f4f4f0;font-family:'Bebas Neue',sans-serif;font-size:1.6rem;text-align:center;outline:none}
+    .score-inp:focus{border-color:#d4af37}
+    .legend{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;font-size:0.72rem;color:#a0b8a8}
+    .legend-item{display:flex;align-items:center;gap:4px}
+    .legend-dot{width:8px;height:8px;border-radius:2px}
+  `;
 
   return (
-    <>
-      <style dangerouslySetInnerHTML={{ __html: css }} />
+    <div style={{direction:"rtl"}}>
+      <style>{css}</style>
 
-      {/* ── NEW: Winner Page ── */}
-      {showWinnerPage && winnerTeamId && (
-        <WinnerPage
-          winnerTeamId={winnerTeamId}
-          participants={participants}
-          odds={odds}
-          onClose={() => { setShowWinnerPage(false); }}
+      {/* Sub-nav */}
+      <div className="br-nav">
+        <button className={`br-nav-btn${subTab==="groups"?" active":""}`} onClick={()=>setSubTab("groups")}>🏟️ المجموعات</button>
+        <button className={`br-nav-btn${subTab==="knockout"?" active":""}`} onClick={()=>setSubTab("knockout")}>⚔️ الأدوار الإقصائية</button>
+      </div>
+
+      {/* زر التحديث التلقائي */}
+      <div style={{marginBottom:14,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+        <button
+          onClick={handleFetchResults}
+          disabled={fetchingResults}
+          style={{background:fetchingResults?"rgba(255,255,255,0.06)":"linear-gradient(135deg,#44ddff,#0099cc)",border:"none",borderRadius:10,padding:"9px 16px",color:fetchingResults?"#a0b8a8":"#000",fontFamily:"Cairo,sans-serif",fontSize:"0.82rem",fontWeight:700,cursor:fetchingResults?"not-allowed":"pointer",transition:"all .2s",display:"flex",alignItems:"center",gap:6}}
+        >
+          <span style={{display:"inline-block",animation:fetchingResults?"spin 1s linear infinite":"none"}}>🔄</span>
+          {fetchingResults ? "جاري البحث..." : "تحديث النتائج من الإنترنت"}
+        </button>
+        {lastFetch && <span style={{fontSize:"0.72rem",color:"#a0b8a8"}}>آخر تحديث: {lastFetch}</span>}
+        {fetchStatus && <span style={{fontSize:"0.78rem",color:fetchStatus.startsWith("✅")?"#4cff88":fetchStatus.startsWith("⚠️")?"#ffcc44":"#44ddff",fontWeight:700}}>{fetchStatus}</span>}
+      </div>
+
+      {/* Legend */}
+      <div className="legend">
+        <div className="legend-item"><div className="legend-dot" style={{background:"#4cff88"}}/> الأول → دور الـ32</div>
+        <div className="legend-item"><div className="legend-dot" style={{background:"#44ddff"}}/> الثاني → دور الـ32</div>
+        <div className="legend-item"><div className="legend-dot" style={{background:"rgba(255,200,60,0.7)"}}/> الثالث → قد يتأهل</div>
+        {compTeamIds.size > 0 && <div className="legend-item"><span style={{background:"rgba(212,175,55,0.2)",border:"1px solid rgba(212,175,55,0.4)",borderRadius:4,padding:"1px 5px",fontSize:"0.65rem",color:"#d4af37"}}>⭐</span> منتخب مسابقتك</div>}
+      </div>
+
+      {/* ══ GROUPS VIEW ══ */}
+      {subTab === "groups" && (
+        <div>
+          {Object.keys(GROUPS_DATA).map(g => {
+            const gTeams = GROUPS_DATA[g].teams;
+            const matches = getGroupMatches(g);
+            const matchResults = matches.map(m => {
+              const key = `${g}_${m.home.id}_${m.away.id}`;
+              const r = matchData[key];
+              return { homeId: m.home.id, awayId: m.away.id, ...(r || { played: false, homeScore:0, awayScore:0 }) };
+            });
+            const standings = calcStandings(gTeams, matchResults);
+            const playedCount = matchResults.filter(r => r.played).length;
+
+            return (
+              <div key={g} className="group-card">
+                <div className="group-hdr">
+                  <div className="group-lbl">المجموعة {g}</div>
+                  <div style={{fontSize:"0.7rem",color:"#a0b8a8"}}>{playedCount}/6 مباراة</div>
+                </div>
+
+                {/* Standings table */}
+                <table className="group-table">
+                  <thead>
+                    <tr>
+                      <th style={{textAlign:"right"}}>الفريق</th>
+                      <th>ل</th><th>ف</th><th>ت</th><th>خ</th>
+                      <th>له</th><th>عليه</th><th>+/-</th>
+                      <th style={{color:"#d4af37"}}>ن</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {standings.map((t, ri) => {
+                      const isComp = compTeamIds.has(t.id);
+                      const rowClass = ri === 0 ? "qualify-1" : ri === 1 ? "qualify-2" : ri === 2 ? "qualify-3" : "";
+                      return (
+                        <tr key={t.id} className={rowClass} style={isComp ? {background:"rgba(212,175,55,0.06)"} : {}}>
+                          <td>
+                            <div className="team-cell">
+                              <span className="team-flag-sm">{t.flag}</span>
+                              <span className="team-name-sm">{t.name}</span>
+                              {t.host && <span style={{fontSize:"0.6rem",color:"#44ddff"}}>★</span>}
+                              {isComp && <span className="comp-badge">⭐</span>}
+                            </div>
+                          </td>
+                          <td>{t.p}</td>
+                          <td>{t.w}</td>
+                          <td>{t.d}</td>
+                          <td>{t.l}</td>
+                          <td>{t.gf}</td>
+                          <td>{t.ga}</td>
+                          <td style={{color: (t.gf-t.ga)>0?"#4cff88":(t.gf-t.ga)<0?"#ff8866":"#a0b8a8"}}>{t.gf-t.ga > 0 ? "+" : ""}{t.gf-t.ga}</td>
+                          <td style={{fontWeight:900,color:"#d4af37",fontFamily:"'Bebas Neue',sans-serif",fontSize:"1rem"}}>{t.pts}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+
+                {/* Matches list */}
+                {adminUnlocked && (
+                  <div className="match-list">
+                    <div style={{fontSize:"0.7rem",color:"#a0b8a8",marginBottom:4}}>⚽ المباريات — اضغط لإدخال النتيجة</div>
+                    {matches.map((m, mi) => {
+                      const key = `${g}_${m.home.id}_${m.away.id}`;
+                      const r = matchData[key];
+                      return (
+                        <div key={key} className="match-row" onClick={()=>{setEditingMatch(key);setEditScore(r?{home:String(r.homeScore),away:String(r.awayScore)}:{home:"",away:""});}}>
+                          <span className="match-team home">{m.home.flag} {m.home.name}</span>
+                          <span className={`match-score ${r?.played?"played":"tbd"}`}>
+                            {r?.played
+                              ? `${r.homeScore} - ${r.awayScore}`
+                              : MATCH_SCHEDULE[key]?.time || "- vs -"}
+                          </span>
+                          {!r?.played && MATCH_SCHEDULE[key] && (
+                            <span style={{fontSize:"0.6rem",color:"#a0b8a8",minWidth:80,textAlign:"center"}}>{MATCH_SCHEDULE[key].date}</span>
+                          )}
+                          <span className="match-team away">{m.away.name} {m.away.flag}</span>
+                          {r?.played && (
+                            <button style={{background:"none",border:"none",color:"#ff7777",cursor:"pointer",fontSize:"0.7rem",padding:"0 2px"}} onClick={e=>{e.stopPropagation();clearMatch(key);}}>✕</button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Show matches for non-admin */}
+                {!adminUnlocked && (
+                  <div className="match-list">
+                    {matches.map(m => {
+                      const key = `${g}_${m.home.id}_${m.away.id}`;
+                      const r = matchData[key];
+                      const sched = MATCH_SCHEDULE[key];
+                      return (
+                        <div key={key} style={{display:"flex",alignItems:"center",gap:4,padding:"4px 0",fontSize:"0.72rem",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                          <span style={{flex:1,textAlign:"right",fontWeight:600}}>{m.home.flag} {m.home.name}</span>
+                          <div style={{textAlign:"center",minWidth:72}}>
+                            {r?.played
+                              ? <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1rem",color:"#4cff88"}}>{r.homeScore} - {r.awayScore}</span>
+                              : <div>
+                                  <div style={{color:"#d4af37",fontWeight:700,fontSize:"0.75rem"}}>{sched?.time || "-"}</div>
+                                  <div style={{color:"#a0b8a8",fontSize:"0.6rem"}}>{sched?.date || ""}</div>
+                                </div>
+                            }
+                          </div>
+                          <span style={{flex:1,fontWeight:600}}>{m.away.name} {m.away.flag}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ══ KNOCKOUT VIEW ══ */}
+      {subTab === "knockout" && (
+        <KnockoutView
+          adminUnlocked={adminUnlocked}
+          matchData={matchData}
+          knockoutData={knockoutData}
+          allThirds={allThirds}
+          compTeamIds={compTeamIds}
+          onEdit={(key, teams) => setEditingKO({key, teams})}
+          onClear={clearKO}
+          saveKO={saveKO}
+          editingKO={editingKO}
+          setEditingKO={setEditingKO}
         />
       )}
 
-      <div className="pitch-bg">
-        {/* Header */}
-        <div className="hdr">
-          <div className="hdr-trophy">🏆</div>
-          <div className="hdr-title">WORLD CUP 2026</div>
-          <div className="hdr-sub">مسابقة التوقع — اختر منتخبك والفائز يكسب التيشرت</div>
-          <div style={{display:"flex",justifyContent:"center",gap:8,flexWrap:"wrap"}}>
-            <div className="hdr-live">
-              <span className="live-dot"/>
-              {rtConnected ? "Realtime • متصل مباشرة" : "جاري الاتصال..."}
+      {/* ══ MATCH SCORE MODAL ══ */}
+      {editingMatch && (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={e=>e.target===e.currentTarget&&setEditingMatch(null)}>
+          <div className="modal-sm">
+            <div style={{textAlign:"center",marginBottom:16,fontSize:"0.9rem",fontWeight:700,color:"#d4af37"}}>⚽ إدخال نتيجة المباراة</div>
+            {(() => {
+              const parts = editingMatch.split("_");
+              const g = parts[0];
+              const homeId = parts[1], awayId = parts[2];
+              const homeT = GROUPS_DATA[g]?.teams.find(t=>t.id===homeId);
+              const awayT = GROUPS_DATA[g]?.teams.find(t=>t.id===awayId);
+              return (
+                <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:12,marginBottom:20}}>
+                  <div style={{textAlign:"center"}}>
+                    <div style={{fontSize:"1.4rem"}}>{homeT?.flag}</div>
+                    <div style={{fontSize:"0.74rem",fontWeight:700,marginBottom:6}}>{homeT?.name}</div>
+                    <input className="score-inp" type="number" min="0" max="20" value={editScore.home}
+                      onChange={e=>setEditScore(p=>({...p,home:e.target.value}))} placeholder="0"/>
+                  </div>
+                  <div style={{fontSize:"0.8rem",color:"#a0b8a8",fontWeight:700}}>-</div>
+                  <div style={{textAlign:"center"}}>
+                    <div style={{fontSize:"1.4rem"}}>{awayT?.flag}</div>
+                    <div style={{fontSize:"0.74rem",fontWeight:700,marginBottom:6}}>{awayT?.name}</div>
+                    <input className="score-inp" type="number" min="0" max="20" value={editScore.away}
+                      onChange={e=>setEditScore(p=>({...p,away:e.target.value}))} placeholder="0"/>
+                  </div>
+                </div>
+              );
+            })()}
+            <div style={{display:"flex",gap:8}}>
+              <button style={{flex:1,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:10,padding:"9px",color:"#a0b8a8",fontFamily:"Cairo,sans-serif",cursor:"pointer"}} onClick={()=>setEditingMatch(null)}>إلغاء</button>
+              <button style={{flex:2,background:"linear-gradient(135deg,#d4af37,#b8962e)",border:"none",borderRadius:10,padding:"9px",color:"#000",fontFamily:"Cairo,sans-serif",fontWeight:900,cursor:"pointer"}} onClick={saveMatch}>✓ حفظ</button>
             </div>
-            {!regOpen && <div style={{display:"inline-flex",alignItems:"center",gap:6,background:"rgba(255,60,60,.12)",border:"1px solid rgba(255,60,60,.4)",borderRadius:20,padding:"3px 12px",fontSize:"0.73rem",color:"#ff8888"}}>🔒 التسجيل مغلق</div>}
           </div>
         </div>
+      )}
+    </div>
+  );
+}
 
-        {/* Nav */}
-        <div className="nav">
-          <button className={`nav-btn${tab==="matches"?" active":""}`} onClick={()=>setTab("matches")}>📅 المباريات</button>
-          <button className={`nav-btn${tab==="leaderboard"?" active":""}`} onClick={()=>setTab("leaderboard")}>🏅 الترتيب</button>
-          <button className={`nav-btn${tab==="stats"?" active":""}`} onClick={()=>setTab("stats")}>📊 إحصائيات</button>
-          <button className={`nav-btn${tab==="bracket"?" active":""}`} onClick={()=>setTab("bracket")}>🗺️ الخريطة</button>
-          <button className={`nav-btn${tab==="guide"?" active":""}`} onClick={()=>setTab("guide")}>🌍 الدليل</button>
-          <button className={`nav-btn${tab==="terms"?" active":""}`} onClick={()=>setTab("terms")}>📜 الشروط</button>
-          <button className={`nav-btn${tab==="admin"?" active":""}`} onClick={()=>setTab("admin")}>⚙️</button>
+// ── Knockout View ─────────────────────────────────────
+function KnockoutView({ adminUnlocked, knockoutData, allThirds, compTeamIds, onEdit, onClear, saveKO, editingKO, setEditingKO }) {
+
+  // بناء أزواج دور الـ32 (8 أزواج من المجموعات + 8 أزواج من الثالثين وباقي المجموعات)
+  // الترتيب الرسمي: 1A vs TBD, 1C vs 3rd, 1E vs 3rd, 1G vs 2H, 1I vs 2L, 1K vs 2J, ...
+  // سنستخدم تبسيط: 1st ضد 2nd من المجموعات المجاورة + 8 ثالثين
+
+  const r32Pairs = [
+    // الربع الأول
+    { id:"r32_1",  home:"1A", away:"3CDEF" },
+    { id:"r32_2",  home:"1B", away:"3AGHI" },
+    { id:"r32_3",  home:"2A", away:"2C"    },
+    { id:"r32_4",  home:"1C", away:"2B"    },
+    // الربع الثاني
+    { id:"r32_5",  home:"1D", away:"3BIJK" },
+    { id:"r32_6",  home:"1E", away:"2D"    },
+    { id:"r32_7",  home:"2E", away:"3FGJK" },
+    { id:"r32_8",  home:"1F", away:"2G"    },
+    // الربع الثالث
+    { id:"r32_9",  home:"1G", away:"2F"    },
+    { id:"r32_10", home:"2I", away:"3AHJL" },
+    { id:"r32_11", home:"1H", away:"2K"    },
+    { id:"r32_12", home:"1I", away:"2H"    },
+    // الربع الرابع
+    { id:"r32_13", home:"1J", away:"2L"    },
+    { id:"r32_14", home:"2J", away:"3BCEL" },
+    { id:"r32_15", home:"1K", away:"2I"    },
+    { id:"r32_16", home:"1L", away:"2K"    },
+  ];
+
+  const r16Pairs = Array.from({length:8},(_,i) => ({
+    id:`r16_${i+1}`,
+    home: `فائز ر32 م${i*2+1}`,
+    away: `فائز ر32 م${i*2+2}`,
+  }));
+
+  const qfPairs = Array.from({length:4},(_,i) => ({
+    id:`qf_${i+1}`,
+    home: `فائز ر16 م${i*2+1}`,
+    away: `فائز ر16 م${i*2+2}`,
+  }));
+
+  const sfPairs = [
+    { id:"sf_1", home:"فائز ر8 م1", away:"فائز ر8 م2" },
+    { id:"sf_2", home:"فائز ر8 م3", away:"فائز ر8 م4" },
+  ];
+
+  const finalPair   = { id:"final",   home:"فائز ن.ف 1", away:"فائز ن.ف 2" };
+  const thirdPair   = { id:"third",   home:"خاسر ن.ف 1", away:"خاسر ن.ف 2" };
+
+  function KOMatch({ pair, label }) {
+    const winner = knockoutData[pair.id];
+    const home = winner?.home || knockoutData[`${pair.id}_home`] || pair.home;
+    const away = winner?.away || knockoutData[`${pair.id}_away`] || pair.away;
+    const winnerTeam = winner?.winner;
+
+    return (
+      <div className="ko-match" onClick={()=>adminUnlocked&&onEdit(pair.id, {home, away})}>
+        <span className={`ko-team home${winnerTeam===home?" ko-won":""}`}>{home}</span>
+        <span className="ko-vs">{winnerTeam ? "●" : "VS"}</span>
+        <span className={`ko-team away${winnerTeam===away?" ko-won":""}`}>{away}</span>
+        {winnerTeam && <span style={{fontSize:"0.7rem",color:"#4cff88",minWidth:50,textAlign:"center"}}>✓ {winnerTeam}</span>}
+        {adminUnlocked && winnerTeam && (
+          <button style={{background:"none",border:"none",color:"#ff7777",cursor:"pointer",fontSize:"0.7rem"}} onClick={e=>{e.stopPropagation();onClear(pair.id);}}>✕</button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {/* دور الـ 32 */}
+      <div className="ko-section">
+        <div className="ko-title">⚽ دور الـ 32 — 16 مباراة</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+          {r32Pairs.map(p => <KOMatch key={p.id} pair={p}/>)}
         </div>
+      </div>
 
-        <div className="main">
-
-          {/* ══ MATCHES ══ */}
-          {tab === "matches" && (
-            <MatchesTab
-              matchData={matchesData}
-              loading={matchesLoading}
-              lastUpdate={matchesLastUpdate}
-              fetchingNow={matchesFetching}
-              onRefresh={doFetchMatches}
-            />
-          )}
-
-          {/* ══ TERMS ══ */}
-          {tab === "terms" && (
-            <div className="card">
-              <div className="card-title">📜 الشروط والأحكام</div>
-              <div className="card-sub">اقرأ الشروط كاملاً قبل التسجيل</div>
-              <div className="terms-wrap">
-                {TERMS.map((sec, si) => (
-                  <div key={si} className="terms-section">
-                    <div className="terms-section-title"><span style={{fontSize:"1.1rem"}}>{sec.icon}</span>{sec.title}</div>
-                    {sec.items.map((item, ii) => (
-                      <div key={ii} className="terms-item">
-                        <span className="terms-item-icon">{item.icon}</span>
-                        <span>{item.text}</span>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-              <div className={`terms-accept-row${termsAccepted?" checked":""}`} onClick={()=>setTermsAccepted(v=>!v)}>
-                <div className="cb">{termsAccepted&&<span style={{color:"#000",fontWeight:900,fontSize:"0.8rem"}}>✓</span>}</div>
-                <span>أقرّ بأنني قرأت الشروط والأحكام كاملةً وأوافق عليها، وأتعهد بالالتزام بها طوال فترة المسابقة.</span>
-              </div>
-              <button className="btn" disabled={!termsAccepted} onClick={()=>setTab("register")}>موافق — انتقل للتسجيل ←</button>
-            </div>
-          )}
-
-          {/* ══ REGISTER ══ */}
-          {tab === "register" && (
-            <div className="card">
-              <div className="card-title">سجّل مشاركتك 🎯</div>
-              {isRegClosed && (
-                <div className="reg-closed-banner">
-                  🔒 التسجيل مغلق حالياً — {regOpen ? "انتهى وقت التسجيل" : "أُوقف التسجيل من الإدارة"}
-                </div>
-              )}
-              {!isRegClosed && (
-                <>
-                  <div className="steps">
-                    {["المعلومات","المنتخب","التيشرت"].map((s,i)=>(
-                      <div key={i} style={{display:"flex",alignItems:"center",gap:6}}>
-                        {i>0&&<div className="step-line"/>}
-                        <div className={`step${regStep===i+1?" active":regStep>i+1?" done":""}`}>
-                          <div className="step-num">{regStep>i+1?"✓":i+1}</div>
-                          <span style={{fontSize:"0.72rem",color:regStep===i+1?"var(--gold)":"var(--muted)"}}>{s}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <CountdownBanner />
-                  <div className="prize-box">
-                    <b>👕 الجائزة: تيشرت المنتخب الفائز أصلي</b>
-                    تُوزَّع التكلفة على المشاركين الخاسرين بالتساوي
-                  </div>
-
-                  {regStep === 1 && (
-                    <>
-                      <div className="lbl">اسمك الكامل</div>
-                      <input className="inp" placeholder="اكتب اسمك هنا..." value={regName}
-                        onChange={e=>setRegName(e.target.value)}
-                        onKeyDown={e=>e.key==="Enter"&&regName.trim()&&setRegStep(2)} />
-                      <button className="btn" disabled={!regName.trim()} onClick={()=>setRegStep(2)}>التالي ←</button>
-                      {!termsAccepted&&<div style={{textAlign:"center",marginTop:10,fontSize:"0.75rem",color:"#ffaa44"}}>⚠️ لم توافق على الشروط بعد — <span style={{color:"var(--gold)",cursor:"pointer",textDecoration:"underline"}} onClick={()=>setTab("terms")}>اقرأها هنا</span></div>}
-                    </>
-                  )}
-
-                  {regStep === 2 && (
-                    <>
-                      <input className="inp" placeholder="🔍 ابحث عن منتخب..." value={searchTeam}
-                        onChange={e=>setSearchTeam(e.target.value)}
-                        style={{marginBottom:10,fontSize:"0.86rem",padding:"9px 13px"}} />
-                      {regTeam&&<div style={{textAlign:"center",marginBottom:10,fontSize:"0.86rem",color:"var(--gold)"}}>✓ اخترت: {TEAMS.find(t=>t.id===regTeam)?.flag} {TEAMS.find(t=>t.id===regTeam)?.name}</div>}
-                      <div className="team-grid">
-                        {filteredTeams.map(team=>{
-                          const p=odds[team.id]||team.odds, cnt=teamCount(team.id), full=cnt>=MAX_PER_TEAM;
-                          return (
-                            <div key={team.id} className={`t-tile ${tierClass(p)}${regTeam===team.id?" sel-t":""}${full?" full":""}`}
-                              onClick={()=>!full&&setRegTeam(team.id)}>
-                              <span className="t-flag">{team.flag}</span>
-                              <div className="t-name">{team.name}</div>
-                              <div className="t-odds">~{p}%</div>
-                              <div className="t-count">{full?"🔒 ممتلئ":`${cnt}/${MAX_PER_TEAM}`}</div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <div style={{display:"flex",gap:8}}>
-                        <button className="btn btn-outline btn-sm" style={{flex:1}} onClick={()=>setRegStep(1)}>→ رجوع</button>
-                        <button className="btn btn-sm" style={{flex:2}} disabled={!regTeam} onClick={()=>setRegStep(3)}>التالي ←</button>
-                      </div>
-                    </>
-                  )}
-
-                  {regStep === 3 && (
-                    <>
-                      <div style={{textAlign:"center",marginBottom:14,padding:"10px",background:"rgba(212,175,55,.08)",borderRadius:10,fontSize:"0.84rem",color:"var(--gold-light)"}}>
-                        {TEAMS.find(t=>t.id===regTeam)?.flag} {TEAMS.find(t=>t.id===regTeam)?.name} — هذه البيانات ستُطبَع على تيشرتك عند الفوز
-                      </div>
-                      <div className="lbl">الاسم المطبوع على التيشرت</div>
-                      <input className="inp" placeholder="مثال: Mohammed" value={regJerseyName} onChange={e=>setRegJerseyName(e.target.value)} />
-                      <div className="lbl">الرقم المطبوع على التيشرت</div>
-                      <input className="inp" placeholder="مثال: 10" value={regJerseyNum}
-                        onChange={e=>setRegJerseyNum(e.target.value.replace(/[^0-9]/g,"").slice(0,2))} />
-                      <div className="lbl" style={{marginBottom:10}}>اختر طقمك 👕</div>
-                      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:18}}>
-                        {JERSEY_KIT_TYPES.map(kit => (
-                          <div key={kit.id} onClick={()=>setRegJerseyColor(kit.id)}
-                            style={{border:regJerseyColor===kit.id?"2px solid var(--gold)":"2px solid rgba(255,255,255,0.1)",borderRadius:14,padding:"12px 6px 8px",background:regJerseyColor===kit.id?"rgba(212,175,55,0.12)":"rgba(255,255,255,0.04)",cursor:"pointer",textAlign:"center",boxShadow:regJerseyColor===kit.id?"0 0 16px rgba(212,175,55,0.3)":"none",transition:"all 0.18s",position:"relative"}}>
-                            {regJerseyColor===kit.id&&<div style={{position:"absolute",top:6,left:8,fontSize:"0.65rem",color:"var(--gold)",fontWeight:900}}>✓</div>}
-                            <JerseyCard teamId={regTeam} kitType={kit.id} teamName={TEAMS.find(t=>t.id===regTeam)?.name} teamEn={TEAMS.find(t=>t.id===regTeam)?.en} size={90} showName={regJerseyName} showNumber={regJerseyNum}/>
-                            <div style={{fontSize:"0.72rem",fontWeight:700,color:regJerseyColor===kit.id?"var(--gold)":"var(--muted)",marginTop:4}}>{kit.label}</div>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="lbl" style={{marginBottom:8}}>المقاس</div>
-                      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:18}}>
-                        {JERSEY_SIZES.map(s=>(
-                          <button key={s} onClick={()=>setRegJerseySize(s)}
-                            style={{padding:"7px 14px",borderRadius:8,cursor:"pointer",fontFamily:"Cairo,sans-serif",fontSize:"0.82rem",fontWeight:700,border:regJerseySize===s?"2px solid var(--gold)":"1.5px solid rgba(255,255,255,0.15)",background:regJerseySize===s?"rgba(212,175,55,0.18)":"rgba(255,255,255,0.05)",color:regJerseySize===s?"var(--gold)":"var(--muted)",transition:"all 0.15s"}}>{s}</button>
-                        ))}
-                      </div>
-                      <div className="lbl">صورتك الشخصية <span style={{color:"var(--muted)",fontWeight:400}}>(اختياري)</span></div>
-                      <div style={{border:"1.5px dashed rgba(212,175,55,.3)",borderRadius:10,padding:"14px",textAlign:"center",marginBottom:14,cursor:"pointer",fontSize:"0.82rem",color:"var(--muted)"}} onClick={()=>fileRef.current?.click()}>
-                        {regPhoto
-                          ? <><img src={regPhoto} alt="" style={{width:60,height:60,borderRadius:"50%",objectFit:"cover",border:"2px solid var(--gold)"}}/><br/><span style={{color:"var(--gold)",fontSize:"0.75rem"}}>✓ تم رفع الصورة</span></>
-                          : <><span style={{fontSize:"1.5rem"}}>📸</span><br/>اضغط لإضافة صورة<br/><span style={{fontSize:"0.72rem"}}>سنريك شكلك وأنت تلبس التيشرت</span></>
-                        }
-                      </div>
-                      <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}}
-                        onChange={e=>{
-                          const f=e.target.files?.[0]; if(!f) return;
-                          const canvas=document.createElement('canvas'); const ctx=canvas.getContext('2d'); const img=new Image();
-                          const url=URL.createObjectURL(f);
-                          img.onload=()=>{ const MAX=800; let w=img.width,h=img.height; if(w>h){if(w>MAX){h=h*MAX/w;w=MAX;}}else{if(h>MAX){w=w*MAX/h;h=MAX;}} canvas.width=w; canvas.height=h; ctx.drawImage(img,0,0,w,h); URL.revokeObjectURL(url); setRegPhoto(canvas.toDataURL('image/jpeg',0.85)); };
-                          img.onerror=()=>{ const r=new FileReader(); r.onload=ev=>setRegPhoto(ev.target.result); r.readAsDataURL(f); };
-                          img.src=url;
-                        }} />
-                      <div style={{display:"flex",gap:8}}>
-                        <button className="btn btn-outline btn-sm" style={{flex:1}} onClick={()=>setRegStep(2)}>→ رجوع</button>
-                        <button className="btn btn-sm" style={{flex:2}} disabled={!regJerseyName.trim()||!regJerseyNum.trim()||submitting} onClick={handleRegister}>
-                          {submitting ? <span><span className="spin">⟳</span> جاري التسجيل...</span> : "تأكيد التسجيل ✓"}
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-
-          {/* ══ LEADERBOARD ══ */}
-          {tab === "leaderboard" && (
-            <>
-              <div className="upd-bar">
-                <div className="upd-time">
-                  {lastUpdate?`آخر تحديث: ${lastUpdate}`:"BetMGM / DraftKings"}
-                  <span style={{marginRight:8,color:"#4cff88",fontSize:"0.7rem"}}>● {participants.length} مشارك</span>
-                </div>
-                <button className="upd-btn" onClick={handleUpdateOdds} disabled={loadingOdds}>
-                  {loadingOdds?<span className="spin">⟳</span>:"⟳"} تحديث
-                </button>
-              </div>
-              <CountdownBanner />
-
-              {voteChangeTarget&&(
-                <div className="card" style={{marginBottom:14}}>
-                  <div className="card-title" style={{fontSize:"1rem",marginBottom:10}}>🔄 تغيير التصويت</div>
-                  <div style={{background:"rgba(68,221,255,.07)",border:"1px solid rgba(68,221,255,.25)",borderRadius:10,padding:"10px 12px",marginBottom:12,fontSize:"0.8rem",color:"#a0e8ff"}}>متاح مرة واحدة فقط بعد انتهاء دور المجموعات</div>
-                  <input className="inp" placeholder="🔍 ابحث..." value={searchTeam} onChange={e=>setSearchTeam(e.target.value)} style={{marginBottom:10,fontSize:"0.84rem",padding:"9px 13px"}} />
-                  <div className="team-grid" style={{maxHeight:200}}>
-                    {filteredTeams.map(team=>{
-                      const p=odds[team.id]||team.odds, cnt=teamCount(team.id), full=cnt>=MAX_PER_TEAM;
-                      return <div key={team.id} className={`t-tile ${tierClass(p)}${voteChangeTeam===team.id?" sel-t":""}${full?" full":""}`} onClick={()=>!full&&setVoteChangeTeam(team.id)}><span className="t-flag">{team.flag}</span><div className="t-name">{team.name}</div><div className="t-odds">~{p}%</div></div>;
-                    })}
-                  </div>
-                  <div style={{display:"flex",gap:8,marginTop:8}}>
-                    <button className="btn btn-outline btn-sm" style={{flex:1}} onClick={()=>{setVoteChangeTarget(null);setVoteChangeTeam(null);}}>إلغاء</button>
-                    <button className="btn btn-sm" style={{flex:2}} disabled={!voteChangeTeam} onClick={handleVoteChange}>تأكيد التغيير</button>
-                  </div>
-                </div>
-              )}
-
-              {loading
-                ? <div className="loading-overlay"><span className="spin-big">⟳</span>جاري تحميل المشاركين...</div>
-                : leaderboard.length === 0
-                  ? <div className="empty"><div className="ei">🎯</div><p>لا يوجد مشاركون بعد<br/>ادعُ أصدقاءك يسجلوا!</p></div>
-                  : leaderboard.map((p,i)=>{
-                    const prob=odds[p.team_id]||0;
-                    const rc=i===0?"r1":i===1?"r2":i===2?"r3":"rn";
-                    const ri=i===0?"🥇":i===1?"🥈":i===2?"🥉":`${i+1}`;
-                    return (
-                      <div key={p.id} className={`p-card ${rc}`} onClick={()=>openModal(p)}>
-                        <div className="r-badge">{ri}</div>
-                        {p.photo ? <img src={p.photo} style={{width:42,height:42,borderRadius:"50%",objectFit:"cover",border:"2px solid var(--gold)",flexShrink:0}} alt=""/> : <div className="p-flag">{p.team_flag}</div>}
-                        <div className="p-info">
-                          <div className="p-name">{p.name}</div>
-                          <div className="p-team">{p.team_flag} {p.team_name} • {p.jersey?.size}</div>
-                          {p.vote_changed&&<div className="p-changed">🔄 غيّر تصويته</div>}
-                        </div>
-                        <div className="p-prob">
-                          <div className="p-val" style={{color:probColor(prob)}}>{prob}%</div>
-                          <div className="p-lbl">احتمال الفوز</div>
-                        </div>
-                        {p.can_change_vote&&!p.vote_changed&&(
-                          <button className="btn btn-sm btn-outline" style={{fontSize:"0.68rem",padding:"5px 8px",width:"auto",minWidth:0}}
-                            onClick={e=>{e.stopPropagation();setVoteChangeTarget(p.id);setVoteChangeTeam(null);}}>🔄</button>
-                        )}
-                        <div className="p-bar-wrap"><div className="p-bar" style={{width:`${Math.round((prob/topProb)*100)}%`,background:barGrad(prob)}}/></div>
-                      </div>
-                    );
-                  })
-              }
-              {!loading&&leaderboard.length>0&&<div style={{textAlign:"center",marginTop:14,fontSize:"0.73rem",color:"var(--muted)"}}>{leaderboard.length} مشارك • اضغط على أي بطاقة لرؤية بيانات التيشرت</div>}
-            </>
-          )}
-
-          {/* ══ STATS ══ */}
-          {tab === "stats" && <StatsTab participants={participants} odds={odds} />}
-
-          {/* ══ BRACKET ══ */}
-          {tab === "bracket" && <BracketTab participants={participants} adminUnlocked={adminUnlocked} />}
-
-          {/* ══ GUIDE ══ */}
-          {tab === "guide" && (
-            <>
-              <div className="card" style={{marginBottom:14}}>
-                <div className="card-title">🌍 دليل المنتخبات</div>
-                <div className="card-sub">من الأقوى للأضعف — احتمالات أسواق الرهان العالمية</div>
-                <div className="g-grid">
-                  {guideSorted.map((team,i)=>{
-                    const p=odds[team.id]||team.odds;
-                    return (
-                      <div key={team.id} className="g-card">
-                        <div className="g-flag">{team.flag}</div>
-                        <div className="g-name">{team.name}</div>
-                        <div className="g-bar-wrap"><div className="g-bar-fill" style={{width:`${Math.round((p/maxGuideP)*100)}%`,background:barGrad(p)}}/></div>
-                        <div className="g-pct">~{p}%</div>
-                        <div className="g-rank">#{i+1}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="card" style={{fontSize:"0.8rem",lineHeight:1.75,color:"rgba(244,244,240,.8)"}}>
-                <div style={{color:"var(--gold)",fontWeight:700,marginBottom:8}}>📌 كيف تقرأ الاحتمالات؟</div>
-                <div>• <span style={{color:"#4cff88"}}>12%+</span> — الأوفر حظاً بقوة</div>
-                <div>• <span style={{color:"#44ddff"}}>6–12%</span> — مرشح جدي</div>
-                <div>• <span style={{color:"#ffcc44"}}>2–6%</span> — منتخب قوي وله فرصة</div>
-                <div>• <span style={{color:"#ff8866"}}>أقل من 2%</span> — مفاجأة محتملة!</div>
-                <div style={{marginTop:8,color:"var(--muted)",fontSize:"0.76rem"}}>تتغير الاحتمالات بعد كل جولة — اضغط "تحديث" في صفحة الترتيب.</div>
-              </div>
-            </>
-          )}
-
-          {/* ══ ADMIN ══ */}
-          {tab === "admin" && (
-            <>
-              {!adminUnlocked ? (
-                <div className="card">
-                  <div className="card-title" style={{marginBottom:16}}>🔒 لوحة الإدارة</div>
-                  <div className="lbl">كلمة المرور</div>
-                  <input className="inp" type="password" placeholder="أدخل كلمة المرور..." value={adminInput}
-                    onChange={e=>setAdminInput(e.target.value)}
-                    onKeyDown={e=>{if(e.key==="Enter"){if(adminInput==="admin2026"){setAdminUnlocked(true);showToast("🔓 تم الدخول");setAdminInput("");}else showToast("❌ كلمة المرور خاطئة");}}} />
-                  <button className="btn" onClick={()=>{
-                    if(adminInput==="admin2026"){setAdminUnlocked(true);showToast("🔓 تم فتح الإدارة");setAdminInput("");}
-                    else showToast("❌ كلمة المرور خاطئة");
-                  }}>دخول</button>
-                </div>
-              ) : (
-                <>
-                  <div className="card">
-                    <div className="card-title" style={{fontSize:"0.95rem",marginBottom:12}}>👥 المشاركون ({participants.length})</div>
-                    {participants.length===0
-                      ? <div style={{color:"var(--muted)",fontSize:"0.82rem"}}>لا يوجد مشاركون</div>
-                      : participants.map(p=>(
-                        <div key={p.id} className="a-row">
-                          <span>{p.team_flag}</span>
-                          <span style={{flex:1}}>{p.name}</span>
-                          <span style={{color:"var(--muted)"}}>{p.jersey?.size}</span>
-                          <span style={{color:"var(--gold)",minWidth:42,textAlign:"center"}}>{odds[p.team_id]||0}%</span>
-                          <button style={{background:"none",border:"none",color:"#4cff88",cursor:"pointer",fontSize:"0.76rem",fontFamily:"Cairo,sans-serif",padding:"2px 5px"}}
-                            onClick={async()=>{await sb.update(p.id,{can_change_vote:true,vote_changed:false});await loadParticipants();showToast("✅ تم تفعيل تغيير التصويت");}}>🔓</button>
-                          <button className="btn btn-danger btn-sm"
-                            onClick={async()=>{await sb.delete(p.id);setParticipants(prev=>prev.filter(x=>x.id!==p.id));}}>حذف</button>
-                        </div>
-                      ))
-                    }
-                  </div>
-
-                  <div className="card">
-                    <div className="card-title" style={{fontSize:"0.95rem",marginBottom:12}}>⚙️ إجراءات</div>
-
-                    {/* Toggle registration */}
-                    <button className={`btn ${regOpen?"btn-danger":"btn-green"}`} style={{marginBottom:8}} onClick={toggleReg}>
-                      {regOpen ? "🔒 إغلاق التسجيل يدوياً" : "🔓 فتح التسجيل"}
-                    </button>
-
-                    {/* Update odds */}
-                    <button className="btn" style={{marginBottom:8}} onClick={handleUpdateOdds} disabled={loadingOdds}>
-                      {loadingOdds?"⟳ جاري التحديث...":"⟳ تحديث الاحتمالات الآن"}
-                    </button>
-
-                    {/* Refresh list */}
-                    <button className="btn btn-green" style={{marginBottom:8}} onClick={loadParticipants}>🔄 تحديث القائمة</button>
-
-                    {/* NEW: CSV Export */}
-                    <button className="btn btn-outline" style={{marginBottom:8}} onClick={()=>{exportCSV(participants);showToast("✅ تم تصدير ملف CSV");}}>
-                      📥 تصدير Excel / CSV
-                    </button>
-
-                    {/* NEW: Declare winner */}
-                    <div style={{marginTop:8,marginBottom:8}}>
-                      <div className="lbl">🏆 الإعلان عن الفائز</div>
-                      <select className="sel" style={{marginBottom:8}} onChange={e => {
-                        if (e.target.value) {
-                          if (window.confirm(`تأكيد: إعلان ${TEAMS.find(t=>t.id===e.target.value)?.name} فائزاً بكأس العالم؟`)) {
-                            declareWinner(e.target.value);
-                            showToast("🏆 تم الإعلان عن الفائز!");
-                          }
-                          e.target.value = "";
-                        }
-                      }}>
-                        <option value="">اختر المنتخب الفائز...</option>
-                        {TEAMS.map(t => <option key={t.id} value={t.id}>{t.flag} {t.name}</option>)}
-                      </select>
-                      {winnerTeamId && (
-                        <div style={{display:"flex",gap:8,alignItems:"center",background:"rgba(255,215,0,0.1)",border:"1px solid rgba(255,215,0,0.3)",borderRadius:10,padding:"8px 12px",marginBottom:8}}>
-                          <span>{TEAMS.find(t=>t.id===winnerTeamId)?.flag}</span>
-                          <span style={{flex:1,fontSize:"0.84rem",color:"var(--gold)"}}>{TEAMS.find(t=>t.id===winnerTeamId)?.name} — الفائز المُعلَن</span>
-                          <button className="btn btn-sm btn-outline" onClick={()=>setShowWinnerPage(true)}>عرض</button>
-                          <button className="btn btn-sm btn-danger" onClick={()=>{setWinnerTeamId(null);setShowWinnerPage(false);localStorage.removeItem("winnerTeamId");}}>إلغاء</button>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Delete all */}
-                    <button className="btn btn-danger" onClick={async()=>{
-                      if(window.confirm("⚠️ حذف جميع المشاركين؟ لا يمكن التراجع.")){
-                        await sb.deleteAll(); setParticipants([]); showToast("تم حذف جميع المشاركين");
-                      }
-                    }}>🗑️ إعادة تعيين المسابقة</button>
-                  </div>
-
-                  <div style={{textAlign:"center",marginTop:8}}>
-                    <button style={{background:"none",border:"none",color:"var(--muted)",fontSize:"0.76rem",cursor:"pointer",fontFamily:"Cairo,sans-serif"}} onClick={()=>setAdminUnlocked(false)}>تسجيل خروج</button>
-                  </div>
-                </>
-              )}
-            </>
-          )}
+      {/* دور الـ 16 */}
+      <div className="ko-section">
+        <div className="ko-title">🔥 دور الـ 16</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+          {r16Pairs.map(p => <KOMatch key={p.id} pair={p}/>)}
         </div>
+      </div>
 
-        {/* Toast */}
-        <div className={`toast${toast.show?" show":""}`}>{toast.msg}</div>
+      {/* ربع النهائي */}
+      <div className="ko-section">
+        <div className="ko-title">💥 ربع النهائي</div>
+        {qfPairs.map(p => <KOMatch key={p.id} pair={p}/>)}
+      </div>
 
-        {/* ══ JERSEY MODAL ══ */}
-        {modalP&&(
-          <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&setModalP(null)}>
-            <div className="modal">
-              <button className="modal-close" onClick={()=>setModalP(null)}>✕</button>
-              <div style={{textAlign:"center",marginBottom:8}}>
-                <div style={{fontSize:"2rem"}}>{modalP.team_flag}</div>
-                <div style={{fontSize:"1.1rem",fontWeight:900,color:"var(--gold)"}}>{modalP.name}</div>
-                <div style={{fontSize:"0.78rem",color:"var(--muted)"}}>{modalP.team_name}</div>
-              </div>
-              <div className="jersey-preview">
-                {modalP.photo && <img src={modalP.photo} style={{width:80,height:80,borderRadius:"50%",objectFit:"cover",border:"3px solid var(--gold)"}} alt=""/>}
-                <div style={{display:"flex",justifyContent:"center",marginTop:modalP.photo?10:0}}>
-                  <JerseyCard teamId={modalP.team_id} kitType={modalP.jersey?.color||"home"} teamName={modalP.team_name} teamEn={TEAMS.find(t=>t.id===modalP.team_id)?.en||modalP.team_name} size={130} showName={modalP.jersey?.name} showNumber={modalP.jersey?.number}/>
-                </div>
-                <div style={{marginTop:4,fontSize:"1.05rem",fontWeight:900}}>
-                  {modalP.jersey?.name} <span style={{color:"var(--gold)"}}>#{modalP.jersey?.number}</span>
-                </div>
-                <div className="jersey-tag">{colorLabel(modalP.jersey?.color)} • {modalP.jersey?.size}</div>
-              </div>
-              <div style={{fontSize:"0.75rem",color:"var(--muted)",marginBottom:6,fontWeight:700}}>🤖 تخيّل الشكل عند الفوز:</div>
-              {aiLoading
-                ? <div className="ai-loading"><span className="spin">⟳</span> جاري التوليد...</div>
-                : aiPreview
-                  ? <div className="ai-preview">{aiPreview}</div>
-                  : <div style={{color:"var(--muted)",fontSize:"0.78rem",textAlign:"center"}}>—</div>
-              }
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginTop:12}}>
-                <div style={{background:"rgba(0,0,0,.3)",borderRadius:10,padding:"10px",textAlign:"center"}}>
-                  <div style={{fontSize:"1.4rem",fontWeight:900,color:probColor(odds[modalP.team_id]||0)}}>{odds[modalP.team_id]||0}%</div>
-                  <div style={{fontSize:"0.68rem",color:"var(--muted)"}}>احتمال الفوز</div>
-                </div>
-                <div style={{background:"rgba(0,0,0,.3)",borderRadius:10,padding:"10px",textAlign:"center"}}>
-                  <div style={{fontSize:"1.4rem",fontWeight:900,color:"var(--gold)"}}>{teamCount(modalP.team_id)}/{MAX_PER_TEAM}</div>
-                  <div style={{fontSize:"0.68rem",color:"var(--muted)"}}>مشتركون بهذا المنتخب</div>
-                </div>
-              </div>
+      {/* نصف النهائي */}
+      <div className="ko-section">
+        <div className="ko-title">🌟 نصف النهائي</div>
+        {sfPairs.map(p => <KOMatch key={p.id} pair={p}/>)}
+      </div>
 
-              {/* NEW: Share on WhatsApp */}
-              <button className="btn btn-whatsapp" style={{marginTop:12}} onClick={()=>shareWhatsApp(modalP, odds[modalP.team_id]||0)}>
-                📤 شارك بطاقتك على واتساب
-              </button>
+      {/* المركز الثالث */}
+      <div className="ko-section">
+        <div className="ko-title">🥉 المركز الثالث</div>
+        <KOMatch pair={thirdPair}/>
+      </div>
 
-              <button className="btn btn-outline" style={{marginTop:8}} onClick={()=>setModalP(null)}>إغلاق</button>
-            </div>
+      {/* النهائي */}
+      <div className="ko-section">
+        <div className="ko-title" style={{color:"#ffd700",fontSize:"1.4rem"}}>🏆 النهائي — 19 يوليو 2026</div>
+        <div style={{background:"linear-gradient(135deg,rgba(212,175,55,0.12),rgba(0,0,0,0.3))",border:"1px solid rgba(212,175,55,0.4)",borderRadius:14,padding:4}}>
+          <KOMatch pair={finalPair}/>
+        </div>
+        {knockoutData["final"]?.winner && (
+          <div style={{textAlign:"center",marginTop:12,padding:"14px",background:"rgba(255,215,0,0.1)",border:"1px solid rgba(255,215,0,0.3)",borderRadius:12}}>
+            <div style={{fontSize:"2rem"}}>🏆</div>
+            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"1.4rem",color:"#ffd700",letterSpacing:2}}>بطل العالم</div>
+            <div style={{fontWeight:900,color:"#fff",fontSize:"1.1rem",marginTop:4}}>{knockoutData["final"].winner}</div>
           </div>
         )}
       </div>
-    </>
+
+      {adminUnlocked && (
+        <div style={{background:"rgba(68,221,255,0.06)",border:"1px solid rgba(68,221,255,0.2)",borderRadius:10,padding:"10px 14px",marginTop:8,fontSize:"0.78rem",color:"#a0e8ff",textAlign:"center"}}>
+          💡 اضغط على أي مباراة لتحديد الفائز أو تعديل الفريقين
+        </div>
+      )}
+
+      {/* KO Edit Modal */}
+      {editingKO && (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={e=>e.target===e.currentTarget&&setEditingKO(null)}>
+          <div style={{background:"#0a2d18",border:"1px solid rgba(212,175,55,0.3)",borderRadius:16,padding:20,maxWidth:340,width:"100%"}}>
+            <div style={{textAlign:"center",marginBottom:14,fontSize:"0.9rem",fontWeight:700,color:"#d4af37"}}>تحديد الفائز</div>
+            <KOTeamInput
+              defaultHome={editingKO.teams.home}
+              defaultAway={editingKO.teams.away}
+              onSave={(home, away, winner) => saveKO(editingKO.key, {home, away, winner})}
+              onCancel={() => setEditingKO(null)}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function KOTeamInput({ defaultHome, defaultAway, onSave, onCancel }) {
+  const [home, setHome] = useState(defaultHome);
+  const [away, setAway] = useState(defaultAway);
+  const [winner, setWinner] = useState("");
+
+  const inpStyle = {width:"100%",background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.14)",borderRadius:8,padding:"8px 10px",color:"#f4f4f0",fontFamily:"Cairo,sans-serif",fontSize:"0.86rem",outline:"none",marginBottom:8,textAlign:"right"};
+
+  return (
+    <div>
+      <div style={{fontSize:"0.74rem",color:"#a0b8a8",marginBottom:4}}>اسم الفريق الأول</div>
+      <input style={inpStyle} value={home} onChange={e=>setHome(e.target.value)} placeholder="مثال: إسبانيا"/>
+      <div style={{fontSize:"0.74rem",color:"#a0b8a8",marginBottom:4}}>اسم الفريق الثاني</div>
+      <input style={inpStyle} value={away} onChange={e=>setAway(e.target.value)} placeholder="مثال: فرنسا"/>
+      <div style={{fontSize:"0.74rem",color:"#a0b8a8",marginBottom:6}}>الفائز (اختياري)</div>
+      <div style={{display:"flex",gap:8,marginBottom:14}}>
+        <button style={{flex:1,padding:"8px",borderRadius:8,cursor:"pointer",fontFamily:"Cairo,sans-serif",fontSize:"0.8rem",fontWeight:700,border:winner===home?"2px solid #4cff88":"1px solid rgba(255,255,255,0.15)",background:winner===home?"rgba(76,255,136,0.15)":"rgba(255,255,255,0.05)",color:winner===home?"#4cff88":"#a0b8a8"}} onClick={()=>setWinner(winner===home?"":home)}>{home||"الأول"}</button>
+        <button style={{flex:1,padding:"8px",borderRadius:8,cursor:"pointer",fontFamily:"Cairo,sans-serif",fontSize:"0.8rem",fontWeight:700,border:winner===away?"2px solid #4cff88":"1px solid rgba(255,255,255,0.15)",background:winner===away?"rgba(76,255,136,0.15)":"rgba(255,255,255,0.05)",color:winner===away?"#4cff88":"#a0b8a8"}} onClick={()=>setWinner(winner===away?"":away)}>{away||"الثاني"}</button>
+      </div>
+      <div style={{display:"flex",gap:8}}>
+        <button style={{flex:1,background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.15)",borderRadius:10,padding:"9px",color:"#a0b8a8",fontFamily:"Cairo,sans-serif",cursor:"pointer"}} onClick={onCancel}>إلغاء</button>
+        <button style={{flex:2,background:"linear-gradient(135deg,#d4af37,#b8962e)",border:"none",borderRadius:10,padding:"9px",color:"#000",fontFamily:"Cairo,sans-serif",fontWeight:900,cursor:"pointer"}} onClick={()=>onSave(home,away,winner||null)}>✓ حفظ</button>
+      </div>
+    </div>
   );
 }
